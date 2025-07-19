@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brevo Service Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .card h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input[type="email"], input[type="file"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="email"]:focus, input[type="file"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin-top: 40px;
+            display: none;
+        }
+
+        .results h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+            border-bottom: 2px solid #28a745;
+            padding-bottom: 10px;
+        }
+
+        .results-content {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fee;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+
+        .success {
+            background: #efe;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+
+        .file-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        @media (max-width: 768px) {
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Brevo Service Dashboard</h1>
+            <p>Manage contacts, send emails, and process CSV files</p>
+        </div>
+
+        <div class="cards-grid">
+            <!-- Add Single Contact -->
+            <div class="card">
+                <h3>📝 Add Contact</h3>
+                <form id="addContactForm">
+                    <div class="form-group">
+                        <label for="contactEmail">Email Address</label>
+                        <input type="email" id="contactEmail" name="email" placeholder="user@example.com" required>
+                    </div>
+                    <button type="submit" class="btn">Add Contact</button>
+                </form>
+            </div>
+
+            <!-- Send Info Email -->
+            <div class="card">
+                <h3>📧 Send Info Email</h3>
+                <form id="sendEmailForm">
+                    <div class="form-group">
+                        <label for="emailRecipient">Email Address</label>
+                        <input type="email" id="emailRecipient" name="email" placeholder="user@example.com" required>
+                    </div>
+                    <button type="submit" class="btn">Send Email</button>
+                </form>
+            </div>
+
+            <!-- Upload CSV -->
+            <div class="card">
+                <h3>📊 Process CSV File</h3>
+                <form id="csvForm">
+                    <div class="form-group">
+                        <label for="csvFile">Choose CSV File</label>
+                        <input type="file" id="csvFile" name="file" accept=".csv" required>
+                        <div class="file-info" id="fileInfo"></div>
+                    </div>
+                    <button type="submit" class="btn">Process CSV</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">Processing...</div>
+
+        <div class="results" id="results">
+            <h3>📋 Results</h3>
+            <div class="results-content" id="resultsContent"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showResults(data, isError = false) {
+            const results = document.getElementById('results');
+            const content = document.getElementById('resultsContent');
+            
+            content.textContent = JSON.stringify(data, null, 2);
+            content.className = `results-content ${isError ? 'error' : 'success'}`;
+            
+            results.style.display = 'block';
+            results.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function handleError(error) {
+            console.error('Error:', error);
+            showResults({
+                error: 'Request failed',
+                message: error.message || 'An unexpected error occurred'
+            }, true);
+        }
+
+        document.getElementById('addContactForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+
+            const formData = new FormData(e.target);
+            const email = formData.get('email');
+
+            try {
+                const response = await fetch(`${API_BASE}/add_contact`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResults(data);
+                    e.target.reset();
+                } else {
+                    showResults(data, true);
+                }
+            } catch (error) {
+                handleError(error);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        document.getElementById('sendEmailForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+
+            const formData = new FormData(e.target);
+            const email = formData.get('email');
+
+            try {
+                const response = await fetch(`${API_BASE}/send-info`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResults(data);
+                    e.target.reset();
+                } else {
+                    showResults(data, true);
+                }
+            } catch (error) {
+                handleError(error);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        document.getElementById('csvForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+
+            const formData = new FormData(e.target);
+            const file = formData.get('file');
+
+            if (!file) {
+                showResults({ error: 'Please select a CSV file' }, true);
+                hideLoading();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/process-csv`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResults(data);
+                    e.target.reset();
+                    document.getElementById('fileInfo').textContent = '';
+                } else {
+                    showResults(data, true);
+                }
+            } catch (error) {
+                handleError(error);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        document.getElementById('csvFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const fileInfo = document.getElementById('fileInfo');
+            
+            if (file) {
+                const size = (file.size / 1024).toFixed(2);
+                fileInfo.textContent = `File: ${file.name} (${size} KB)`;
+            } else {
+                fileInfo.textContent = '';
+            }
+        });
+    </script>
+</body>
+</html> 
