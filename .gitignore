@@ -160,4 +160,19 @@ logs/
 
 # Local development
 .local
-.cache/ 
+.cache/
+
+# Service logs and PID files
+*.log
+*.pid
+brevo_service_*.log
+api_service.log
+background_service.log
+pending_csv/
+logs/
+
+# Windows specific
+*.bat~
+*.ps1~
+Thumbs.db
+Desktop.ini 

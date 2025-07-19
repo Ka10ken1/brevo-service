@@ -4,4 +4,5 @@ requests
 pydantic[email]
 python-multipart
 python-dotenv
+schedule
 
