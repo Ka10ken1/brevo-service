@@ -1,9 +1,9 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel, EmailStr
 from .brevo_service import (
-    invite_user,
+    add_contact,
     send_info_email,
-    get_registered_users,
+    get_existing_contacts,
     handle_csv,
 )
 
@@ -14,13 +14,13 @@ class UserEmail(BaseModel):
     email: EmailStr
 
 
-@router.post("/invite_user")
-async def invite(data: UserEmail):
-    users = get_registered_users()
-    response = invite_user(data.email, users)
-    if response.status_code != 201:
+@router.post("/add_contact")
+async def add_contact_endpoint(data: UserEmail):
+    existing_contacts = get_existing_contacts()
+    response = add_contact(data.email, existing_contacts)
+    if response.status_code not in (201, 204):
         raise HTTPException(status_code=response.status_code, detail=response.text)
-    return {"status": "invited", "email": data.email}
+    return {"status": "contact_added", "email": data.email}
 
 
 @router.post("/send-info")

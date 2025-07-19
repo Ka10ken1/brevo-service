@@ -27,33 +27,42 @@ HEADERS = {
 }
 
 
-def get_registered_users():
-    url = "https://api.brevo.com/v3/account/users"
+def get_existing_contacts():
+    url = "https://api.brevo.com/v3/contacts"
     response = requests.get(url, headers=HEADERS)
     response.raise_for_status()
     data = response.json()
 
-    logging.info("Fetched registered users from Brevo API.")
-    return {user["Email"].lower() for user in data.get("users", [])}
+    logging.info("Fetched existing contacts from Brevo API.")
+    return {contact["email"].lower() for contact in data.get("contacts", [])}
 
 
-def invite_user(email: str, registered_users: set):
-    if email in registered_users:
-        print(f"[-] {email} is already invited.")
+def add_contact(email: str, existing_contacts: set, list_ids=None):
+
+    if email in existing_contacts:
+        logging.info(f"[-] {email} is already a contact.")
         return
 
-    url = "https://api.brevo.com/v3/organization/user/invitation/send"
+    url = "https://api.brevo.com/v3/contacts"
 
-    payload = {"email": email, "all_features_access": True}
+    payload = {
+        "email": email,
+        "updateEnabled": True,  # Update if contact already exists
+    }
+
+    if list_ids:
+        payload["listIds"] = list_ids
+    elif CAMPAIGN_LIST_ID:
+        payload["listIds"] = [CAMPAIGN_LIST_ID]
 
     response: requests.Response = requests.post(url, json=payload, headers=HEADERS)
 
-    if response.status_code != 201:
+    if response.status_code not in (201, 204):
         logging.warning(
-            f"Failed to invite {email}: {response.status_code} {response.text}"
+            f"Failed to add contact {email}: {response.status_code} {response.text}"
         )
     else:
-        logging.info(f"Invited {email}")
+        logging.info(f"Added contact {email}")
 
     return response
 
@@ -112,8 +121,8 @@ def handle_csv(file_bytes: bytes):
 
     reader = csv.DictReader(io.StringIO(decoded))
 
-    registered_users = get_registered_users()
-    results = {"invited": [], "info_sent": [], "errors": []}
+    existing_contacts = get_existing_contacts()
+    results = {"added_contacts": [], "info_sent": [], "errors": []}
 
     for row in reader:
         email = row.get("email") or row.get("Email", "")
@@ -122,18 +131,17 @@ def handle_csv(file_bytes: bytes):
             continue
 
         try:
-            if email in registered_users:
+            if email in existing_contacts:
                 resp = send_info_email(email)
                 if resp.status_code in (200, 201, 202):
                     results["info_sent"].append(email)
                 else:
                     results["errors"].append({"email": email, "error": resp.text})
             else:
-                resp = invite_user(email, registered_users)
-                if resp and resp.status_code in (201, 202):
-                    results["invited"].append(email)
-                    # Optional: send info email right after invite
-                    send_info_email(email)
+                resp = add_contact(email, existing_contacts)
+                if resp and resp.status_code in (201, 204):
+                    results["added_contacts"].append(email)
+                    existing_contacts.add(email)
                 else:
                     results["errors"].append(
                         {
@@ -143,3 +151,5 @@ def handle_csv(file_bytes: bytes):
                     )
         except Exception as e:
             results["errors"].append({"email": email, "error": str(e)})
+
+    return results
