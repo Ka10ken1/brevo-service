@@ -161,7 +161,7 @@ function Show-Status {
     
     # Check for any lingering processes
     Write-Output ""
-    Write-ColorOutput "🔍 Process Analysis:" $Blue
+    Write-ColorOutput "Process Analysis:" $Blue
     $brevoProcesses = @(Get-Process | Where-Object { 
         ($_.ProcessName -eq "python" -and ($_.CommandLine -like "*uvicorn*brevo*" -or $_.CommandLine -like "*brevo.background_service*")) -or
         ($_.ProcessName -eq "uvicorn" -and $_.CommandLine -like "*brevo*")
@@ -170,18 +170,18 @@ function Show-Status {
     if ($brevoProcesses.Count -gt 0) {
         Write-ColorOutput "   Total Brevo-related processes: $($brevoProcesses.Count)" $Blue
         if ($brevoProcesses.Count -gt 2) {
-            Write-ColorOutput "   WARNING: Multiple processes detected. Consider running 'stop' first." $Yellow
+            Write-ColorOutput "   WARNING: Multiple processes detected. Consider running stop first." $Yellow
         }
     } else {
         Write-ColorOutput "   No Brevo processes found" $Blue
     }
     
-    Write-ColorOutput "   🌐 Log viewer: http://localhost:$ApiPort" $Blue
+    Write-ColorOutput "   Log viewer: http://localhost:$ApiPort" $Blue
     
     # Show system info
     $memory = [math]::Round((Get-Process python -ErrorAction SilentlyContinue | Measure-Object WorkingSet -Sum).Sum / 1MB, 2)
     if ($memory -gt 0) {
-        Write-ColorOutput "   💾 Python Memory Usage: ${memory}MB" $Blue
+        Write-ColorOutput "   Python Memory Usage: ${memory}MB" $Blue
     }
 }
 
@@ -251,7 +251,7 @@ function Install-Service {
         nssm set "BrevoAPI" AppDirectory "$currentDir"
         nssm install "BrevoBackground" "python" "-m $BackgroundService"
         nssm set "BrevoBackground" AppDirectory "$currentDir"
-        Write-ColorOutput "Services installed. Use 'sc start BrevoAPI' and 'sc start BrevoBackground' to start them" $Green
+        Write-ColorOutput "Services installed. Use sc start BrevoAPI and sc start BrevoBackground to start them" $Green
     } else {
         Write-ColorOutput "Creating scheduled tasks instead..." $Yellow
         # Create scheduled tasks as fallback
