@@ -36,7 +36,6 @@ class BrevoBackgroundService:
         self._setup_directories()
 
     def _setup_directories(self):
-        """Create necessary directories for the service"""
         directories = [
             Path("pending_csv"),
             self.csv_input_dir,
@@ -58,7 +57,6 @@ class BrevoBackgroundService:
         logger.info(f"  - Failed (errors): {self.csv_failed_dir.absolute()}")
 
     def health_check(self):
-        """Check service health and log status"""
         try:
             api_key = os.getenv("BREVO_API_KEY")
             if not api_key:
@@ -91,7 +89,6 @@ class BrevoBackgroundService:
             logger.error(f"Error processing pending tasks: {str(e)}")
 
     def daily_csv_processing(self):
-        """Process CSV files from the input directory - runs daily"""
         try:
             if not self.csv_input_dir.exists():
                 logger.warning(
@@ -267,4 +264,3 @@ def main():
 
 if __name__ == "__main__":
     exit(main())
-

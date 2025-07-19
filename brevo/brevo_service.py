@@ -83,19 +83,20 @@ def add_contact(email: str, existing_contacts: set, list_ids=None, contact_data=
     if contact_data:
         attributes = {}
         field_mapping = {
+            "tender_code": "TENDER_CODE",
+            "id": "id",
+            "id_code": "Id_code",
+            "vendor_name": "COMPANY_NAME",
+            "phone": "SMS",
             "nat": "NAT",
             "stop": "STOP",
             "contact_id": "COMPANY_ID",
             "contacts": "CONTACTS",
             "website": "WEBSITE",
-            "vendor_name": "COMPANY_NAME",
             "address": "ADDRESS",
-            "id_code": "COMPANY_ID",
-            "phone": "SMS",
             "fax": "FAX",
             "city": "CITY",
             "country": "COUNTRY",
-            "tender_code": "TENDER_CODE",
         }
 
         for key, value in contact_data.items():
@@ -1293,26 +1294,23 @@ def handle_csv(file_bytes: bytes):
     results = {"added_contacts": [], "info_sent": [], "errors": []}
 
     for row in reader:
-        # Try to get email from different possible column names
         email = row.get("email") or row.get("Email") or row.get("EMAIL", "")
         email = email.strip().lower() if email else ""
         if not email:
             continue
 
-        # Extract all additional contact data from CSV
         contact_data = {}
 
-        # Map CSV column names to our internal field names
         csv_field_mapping = {
-            "NAT": "nat",
+            "NAT": "tender_code",
+            "ID": "id",
+            "Company ID": "id_code",
+            "Vendorname": "vendor_name",
+            "Phone": "phone",
             "STOP": "stop",
-            "ID": "contact_id",
             "Contacts": "contacts",
             "Website": "website",
-            "VendorName": "vendor_name",
             "Address": "address",
-            "IdCode": "id_code",
-            "Phone": "phone",
             "Fax": "fax",
             "City": "city",
             "Country": "country",
