@@ -1,5 +1,10 @@
 # Brevo Flow
 
+---
+### Get Started
+```shell
+uvicorn brevo.main:app --reload
+```
 --- 
 ### Single Contact Addition (`POST /add_contact`)
 Client sends: {"email": "user@example.com"}
