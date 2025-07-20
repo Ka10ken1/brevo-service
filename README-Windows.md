@@ -91,7 +91,7 @@ NSSM provides:
 ## 📊 Monitoring
 
 ### Web Dashboard
-Visit `http://localhost:81234` for:
+Visit `http://localhost:8010` for:
 - Real-time log viewer with dark theme
 - Service status monitoring
 - Error tracking and statistics
@@ -120,13 +120,13 @@ The service provides REST API endpoints:
 
 ```powershell
 # Add contact
-Invoke-RestMethod -Uri "http://localhost:81234/add_contact" -Method Post -Body (@{email="user@example.com"} | ConvertTo-Json) -ContentType "application/json"
+Invoke-RestMethod -Uri "http://localhost:8010/add_contact" -Method Post -Body (@{email="user@example.com"} | ConvertTo-Json) -ContentType "application/json"
 
 # Process CSV file
 $form = @{
     file = Get-Item "contacts.csv"
 }
-Invoke-RestMethod -Uri "http://localhost:81234/process-csv" -Method Post -Form $form
+Invoke-RestMethod -Uri "http://localhost:8010/process-csv" -Method Post -Form $form
 ```
 
 ## 🗂️ File Structure
@@ -158,8 +158,8 @@ Add exclusions for:
 - Log files
 
 ### Firewall
-The service uses port 81234. Ensure Windows Firewall allows:
-- Inbound connections on port 81234
+The service uses port 8010. Ensure Windows Firewall allows:
+- Inbound connections on port 8010
 - Python.exe through firewall
 
 ### User Permissions
@@ -178,7 +178,7 @@ For Windows Service installation:
 
 2. **Port Already in Use:**
    ```powershell
-   netstat -ano | findstr :81234
+   netstat -ano | findstr :8010
    ```
 
 3. **Python Not Found:**

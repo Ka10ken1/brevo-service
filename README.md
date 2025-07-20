@@ -57,7 +57,7 @@ run_service.bat stop     # Stop services
 
 ## 📊 Web Dashboard
 
-Visit `http://localhost:81234` for:
+Visit `http://localhost:8010` for:
 - **Real-time log viewer** with dark terminal theme
 - **Service status** monitoring
 - **Error tracking** and statistics
@@ -175,7 +175,7 @@ Get-Content *.log -Wait  # Windows PowerShell
 - **Cross-platform issues** - Check this README
 - **Windows-specific** - See README-Windows.md
 - **API usage** - Visit `/docs` endpoint
-- **Logs** - Web viewer at `http://localhost:81234`
+- **Logs** - Web viewer at `http://localhost:8010`
 
 ---
 
