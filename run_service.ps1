@@ -133,7 +133,6 @@ function Start-Services {
 function Stop-Services {
     Write-ColorOutput "Stopping Brevo Services..." $Yellow
     
-    # Stop services using the helper function
     Stop-Service "api_service"
     Stop-Service "background_service"
     

@@ -13,7 +13,7 @@ SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 CAMPAIGN_LIST_ID = int(os.getenv("CAMPAIGN_LIST_ID", "1"))
 
 logging.basicConfig(
-    level=logging.INFO,  # Change to DEBUG for more details
+    level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
@@ -38,7 +38,6 @@ def get_existing_contacts():
 
 
 def get_detailed_contacts():
-    """Get detailed contact information from Brevo"""
     url = "https://api.brevo.com/v3/contacts"
     response = requests.get(url, headers=HEADERS)
     response.raise_for_status()
@@ -173,7 +172,7 @@ def send_info_email_campaign():
     payload = {
         "sender": {"name": SENDER_NAME, "email": SENDER_EMAIL},
         "name": "Business Partnership Opportunity",
-        "subject": "თარგმნის სახლი - სპეციალური შეთავაზება სატენდერო დოკუმენტებისთვის",
+        "subject": "დოკუმენტაციის თარგმნა ნოტარიულად დამოწმებით",
         "htmlContent": """<!DOCTYPE html>
 <html lang="ka">
 <head>
@@ -732,7 +731,7 @@ def send_info_email(email: str):
     url = "https://api.brevo.com/v3/smtp/email"
     payload = {
         "to": [{"email": email}],
-        "subject": "თარგმნის სახლი - სპეციალური შეთავაზება სატენდერო დოკუმენტებისთვის",
+        "subject": "დოკუმენტაციის თარგმნა ნოტარიულად დამოწმებით",
         "htmlContent": """<!DOCTYPE html>
 <html lang="ka">
 <head>
