@@ -123,10 +123,14 @@ function Start-Services {
     Write-ColorOutput "   API PID: $($apiProcess.Id)" $Blue
     Write-ColorOutput "   Background PID: $($bgProcess.Id)" $Blue
     
-    # Optionally open browser
     $openBrowser = Read-Host "Open log viewer in browser? [y/N]"
     if ($openBrowser -eq "y" -or $openBrowser -eq "Y") {
-        Start-Process "http://localhost:$ApiPort"
+        try {
+            Start-Process cmd -ArgumentList "/c", "start", "http://localhost:$ApiPort" -WindowStyle Hidden
+        }
+        catch {
+            Write-ColorOutput "Could not open browser automatically. Please visit: http://localhost:$ApiPort" $Yellow
+        }
     }
 }
 
