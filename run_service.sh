@@ -4,7 +4,7 @@
 # Usage: ./run_service.sh [start|stop|status|logs]
 
 SERVICE_NAME="brevo-service"
-API_PORT=8000
+API_PORT=81234
 BACKGROUND_SERVICE="brevo.background_service"
 API_SERVICE="brevo.main:app"
 

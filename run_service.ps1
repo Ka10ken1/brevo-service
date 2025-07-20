@@ -8,7 +8,7 @@ param(
 )
 
 $ServiceName = "brevo-service"
-$ApiPort = 8000
+$ApiPort = 81234
 $BackgroundService = "brevo.background_service"
 $ApiService = "brevo.main:app"
 
