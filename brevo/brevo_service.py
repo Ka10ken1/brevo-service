@@ -64,6 +64,14 @@ def get_detailed_contacts():
 
 def add_contact(email: str, existing_contacts: set, list_ids=None, contact_data=None):
 
+    if not API_KEY:
+        logging.error("BREVO_API_KEY is not configured in environment variables")
+        class MockResponse:
+            def __init__(self, status_code, text):
+                self.status_code = status_code
+                self.text = text
+        return MockResponse(500, "BREVO_API_KEY not configured")
+
     logging.info(f"users list: {len(existing_contacts)} contacts found")
 
     contact_exists = email in existing_contacts
@@ -82,20 +90,9 @@ def add_contact(email: str, existing_contacts: set, list_ids=None, contact_data=
     if contact_data:
         attributes = {}
         field_mapping = {
-            "tender_code": "TENDER_CODE",
-            "id": "id",
-            "id_code": "Id_code",
-            "vendor_name": "COMPANY_NAME",
+            "vendor_name": "COMPANY_NAME", 
+            "company_id": "COMPANY_ID",
             "phone": "SMS",
-            "nat": "NAT",
-            "stop": "STOP",
-            "contact_id": "COMPANY_ID",
-            "contacts": "CONTACTS",
-            "website": "WEBSITE",
-            "address": "ADDRESS",
-            "fax": "FAX",
-            "city": "CITY",
-            "country": "COUNTRY",
         }
 
         for key, value in contact_data.items():
@@ -133,6 +130,7 @@ def add_contact(email: str, existing_contacts: set, list_ids=None, contact_data=
                         )
                         continue
 
+                    # Add SMS field normally - handle duplicates at API level
                     attributes[field_mapping[key]] = phone
                 else:
                     attributes[field_mapping[key]] = value
@@ -152,19 +150,49 @@ def add_contact(email: str, existing_contacts: set, list_ids=None, contact_data=
 
     logging.info(f"Sending payload to Brevo: {payload}")
 
-    response: requests.Response = requests.post(url, json=payload, headers=HEADERS)
+    try:
+        response: requests.Response = requests.post(url, json=payload, headers=HEADERS)
+        
+        logging.info(f"Brevo API response: {response.status_code} - {response.text}")
 
-    logging.info(f"Brevo API response: {response.status_code} - {response.text}")
+        if response.status_code == 400 and "SMS is already associated with another Contact" in response.text:
+            logging.warning(f"SMS number already exists for another contact. Retrying {email} without SMS field...")
+            
+            if "attributes" in payload and "SMS" in payload["attributes"]:
+                payload_without_sms = payload.copy()
+                payload_without_sms["attributes"] = {k: v for k, v in payload["attributes"].items() if k != "SMS"}
+                
+                if payload_without_sms["attributes"]:  # If there are other attributes to update
+                    logging.info(f"Retrying with payload: {payload_without_sms}")
+                    retry_response = requests.post(url, json=payload_without_sms, headers=HEADERS)
+                    logging.info(f"Retry without SMS - Brevo API response: {retry_response.status_code} - {retry_response.text}")
+                    return retry_response
+                else:
+                    logging.info(f"No other attributes to update for {email}, treating as success")
+                    class MockResponse:
+                        def __init__(self, status_code, text):
+                            self.status_code = status_code
+                            self.text = text
+                    return MockResponse(204, "No attributes to update after removing duplicate SMS")
+            
+        if response.status_code not in (201, 204):
+            logging.warning(
+                f"Failed to add/update contact {email}: {response.status_code} {response.text}"
+            )
+        else:
+            action = "Updated" if contact_exists else "Added"
+            logging.info(f"{action} contact {email} with additional data")
 
-    if response.status_code not in (201, 204):
-        logging.warning(
-            f"Failed to add/update contact {email}: {response.status_code} {response.text}"
-        )
-    else:
-        action = "Updated" if contact_exists else "Added"
-        logging.info(f"{action} contact {email} with additional data")
-
-    return response
+        return response
+        
+    except Exception as e:
+        logging.error(f"Exception occurred while contacting Brevo API for {email}: {str(e)}")
+        class MockResponse:
+            def __init__(self, status_code, text):
+                self.status_code = status_code
+                self.text = text
+        
+        return MockResponse(500, f"API Exception: {str(e)}")
 
 
 def send_info_email_campaign():
@@ -1301,18 +1329,9 @@ def handle_csv(file_bytes: bytes):
         contact_data = {}
 
         csv_field_mapping = {
-            "NAT": "tender_code",
-            "ID": "id",
-            "Company ID": "id_code",
-            "Vendorname": "vendor_name",
-            "Phone": "phone",
-            "STOP": "stop",
-            "Contacts": "contacts",
-            "Website": "website",
-            "Address": "address",
-            "Fax": "fax",
-            "City": "city",
-            "Country": "country",
+            "VendorName": "vendor_name",    # Maps to COMPANY_NAME  
+            "IdCode": "company_id",         # Maps to COMPANY_ID
+            "Phone": "phone",               # Maps to SMS
         }
 
         for csv_col, field_name in csv_field_mapping.items():
@@ -1322,11 +1341,15 @@ def handle_csv(file_bytes: bytes):
 
         try:
             if email in existing_contacts:
-                resp = send_info_email(email)
-                if resp.status_code in (200, 201, 202):
-                    results["info_sent"].append({"email": email, "data": contact_data})
+                resp = add_contact(email, existing_contacts, contact_data=contact_data)
+                if resp and resp.status_code in (201, 204):
+                    email_resp = send_info_email(email)
+                    if email_resp.status_code in (200, 201, 202):
+                        results["info_sent"].append({"email": email, "data": contact_data})
+                    else:
+                        results["errors"].append({"email": email, "error": f"Updated contact but email failed: {email_resp.text}"})
                 else:
-                    results["errors"].append({"email": email, "error": resp.text})
+                    results["errors"].append({"email": email, "error": f"Failed to update contact: {resp.text if resp else 'No response'}"})
             else:
                 resp = add_contact(email, existing_contacts, contact_data=contact_data)
                 if resp and resp.status_code in (201, 204):
