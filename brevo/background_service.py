@@ -304,9 +304,9 @@ class BrevoBackgroundService:
         schedule.every(5).minutes.do(self.health_check)
         schedule.every().hour.do(self.cleanup_logs)
         schedule.every().day.at("09:00").do(self.send_daily_report)
-        schedule.every().day.at("02:00").do(
+        schedule.every().day.at("11:00").do(
             self.daily_csv_processing
-        )  # Run at 2 AM daily
+        )  # Run at 11 AM daily
 
         logger.info("Background service started successfully")
         logger.info("Scheduled tasks:")
