@@ -3,6 +3,7 @@
 import time
 import logging
 import schedule
+from zoneinfo import ZoneInfo
 import os
 import platform
 from datetime import datetime, timedelta
@@ -18,6 +19,8 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+GEORGIAN_TZ = ZoneInfo("Asia/Tbilisi")
 
 
 class BrevoBackgroundService:
@@ -297,6 +300,12 @@ class BrevoBackgroundService:
         logger.info("Manual CSV processing triggered")
         self.daily_csv_processing()
 
+    def _run_at_georgian_time(self):
+        now = datetime.now(tz=GEORGIAN_TZ)
+        if now.hour == 11 and now.minute == 0:
+            logger.info("Georgian time is 11:00 - running daily_csv_processing")
+            self.daily_csv_processing()
+
     def start(self):
         self.running = True
         logger.info("Starting Brevo Background Service...")
@@ -304,9 +313,9 @@ class BrevoBackgroundService:
         schedule.every(5).minutes.do(self.health_check)
         schedule.every().hour.do(self.cleanup_logs)
         schedule.every().day.at("09:00").do(self.send_daily_report)
-        schedule.every().day.at("11:00").do(
-            self.daily_csv_processing
-        )  # Run at 11 AM daily
+
+        # run at georgian 11:00 AM time
+        schedule.every(1).minutes.do(self._run_at_georgian_time())
 
         logger.info("Background service started successfully")
         logger.info("Scheduled tasks:")
