@@ -7,7 +7,7 @@ from datetime import datetime
 from .brevo_service import (
     add_contact,
     send_info_email,
-    get_existing_contacts,
+    get_existing_contacts_email,
     get_detailed_contacts,
     handle_csv,
 )
@@ -38,7 +38,7 @@ class ContactInfo(BaseModel):
 
 @router.post("/add_contact")
 async def add_contact_endpoint(data: ContactInfo):
-    existing_contacts = get_existing_contacts()
+    existing_contacts = get_existing_contacts_email()
 
     # excluding None values
     contact_data = {}
