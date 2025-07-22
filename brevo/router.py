@@ -102,7 +102,6 @@ async def process_csv_endpoint(file: UploadFile = File(...)):
 
 @router.get("/users")
 async def get_all_users(detailed: bool = False):
-    """Get all registered contacts from Brevo"""
     try:
         if detailed:
             contacts = get_detailed_contacts()

@@ -8,7 +8,7 @@ import os
 import platform
 from datetime import datetime, timedelta
 from pathlib import Path
-from .brevo_service import get_existing_contacts, send_info_email, handle_csv
+from .brevo_service import get_existing_contacts, handle_csv, send_info_email_campaign
 
 log_file = Path("brevo_service.log")
 logging.basicConfig(
@@ -78,7 +78,6 @@ class BrevoBackgroundService:
         else:
             logger.warning(f"Expected CSV file not found: {expected_path}")
 
-            # Show available CSV files in the base directory for debugging
             base_path = Path(self.csv_base_path)
             if base_path.exists():
                 all_csv_files = list(base_path.glob("*.csv"))
@@ -103,7 +102,6 @@ class BrevoBackgroundService:
         logger.info(f"  - Filename Pattern: {self.csv_filename_pattern}")
         logger.info(f"  - File Extension: {self.csv_file_extension}")
 
-        # Test for today and yesterday
         today = datetime.now()
         yesterday = today - timedelta(days=1)
 
@@ -160,7 +158,6 @@ class BrevoBackgroundService:
             return False
 
     def daily_csv_processing(self):
-        """Process CSV files for today's date and optionally yesterday's if today's is missing"""
         try:
             today = datetime.now()
             logger.info(
@@ -210,7 +207,6 @@ class BrevoBackgroundService:
             logger.error(f"Error during manual CSV processing for {date_str}: {str(e)}")
 
     def _process_csv_file(self, csv_file: Path):
-        """Process a single CSV file"""
         try:
             logger.info(f"Processing CSV file: {csv_file.name}")
 
@@ -240,6 +236,19 @@ class BrevoBackgroundService:
                     )
                 if total_errors > 5:
                     logger.warning(f"  ... and {total_errors - 5} more errors")
+
+            if total_processed > 0:
+                logger.info("Creating and sending campaign to processed contacts...")
+                try:
+                    campaign_response = send_info_email_campaign()
+                    if campaign_response.status_code in (201, 202):
+                        logger.info("Campaign created and sent successfully")
+                    else:
+                        logger.warning(f"Campaign creation failed: {campaign_response.status_code} - {campaign_response.text}")
+                except Exception as e:
+                    logger.error(f"Error creating campaign: {str(e)}")
+            else:
+                logger.info("No contacts were processed, skipping campaign creation")
 
             logger.info(f"File processed successfully: {csv_file}")
 
