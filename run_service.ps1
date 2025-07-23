@@ -1,5 +1,5 @@
 # Brevo Service Runner for Windows (PowerShell)
-# Usage: .\run_service.ps1 [start|stop|status|logs|install|uninstall]
+# Usage: .\run_service.ps1 [start|stop|restart|status|logs|install|uninstall]
 
 param(
     [Parameter(Position=0)]
@@ -7,7 +7,9 @@ param(
     [string]$Action = "help"
 )
 
-$ServiceName = "brevo-service"
+$ServiceNameApi = "api_service"
+$ServiceNameBg = "background_service"
+
 $ApiPort = 8010
 $BackgroundService = "brevo.background_service"
 $ApiService = "brevo.main:app"
@@ -22,9 +24,10 @@ function Write-ColorOutput($Message, $Color = [System.ConsoleColor]::White) {
 }
 
 function Test-ProcessRunning($ProcessId) {
+    if (-not $ProcessId) { return $false }
     try {
         $process = Get-Process -Id $ProcessId -ErrorAction Stop
-        return $true
+        return $process -ne $null
     }
     catch {
         return $false
@@ -41,7 +44,7 @@ function Get-ServicePID($ServiceType) {
             }
         }
         catch {
-            # Invalid PID file
+            # Invalid PID file or not running
         }
         Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
     }
@@ -49,80 +52,199 @@ function Get-ServicePID($ServiceType) {
 }
 
 function Test-ServiceRunning($ServiceName) {
-    $processId = Get-ServicePID $ServiceName
-    return $processId -ne $null
+    $pid = Get-ServicePID $ServiceName
+    return $pid -ne $null
+}
+
+# Recursive function to kill a process and all its children
+function Kill-ProcessTree($pid) {
+    if (-not (Test-ProcessRunning $pid)) { return }
+    try {
+        # Find child processes
+        $children = Get-WmiObject Win32_Process -Filter "ParentProcessId = $pid" -ErrorAction SilentlyContinue
+        foreach ($child in $children) {
+            Kill-ProcessTree $child.ProcessId
+        }
+        Write-ColorOutput "Killing process PID $pid and its children..." $Yellow
+        Stop-Process -Id $pid -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 500
+        # Force kill if still running
+        if (Test-ProcessRunning $pid) {
+            Write-ColorOutput "Force killing PID $pid..." $Red
+            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+        }
+    }
+    catch {
+        Write-ColorOutput "Failed to kill PID $pid: $($_.Exception.Message)" $Red
+    }
 }
 
 function Stop-Service($ServiceName) {
     $pidFile = "$ServiceName.pid"
     
+    Write-ColorOutput "Stopping $ServiceName..." $Yellow
+    
+    # Stop by PID file (recursive)
     if (Test-Path $pidFile) {
         try {
             $processId = [int](Get-Content $pidFile -Raw).Trim()
             if (Test-ProcessRunning $processId) {
                 Write-ColorOutput "Stopping $ServiceName (PID: $processId)..." $Yellow
-                Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 2
+                Kill-ProcessTree $processId
             }
         }
         catch {
-            # Process might already be dead
+            Write-ColorOutput "Error reading PID file: $($_.Exception.Message)" $Yellow
         }
         Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
     }
     
-    # Also kill any lingering processes by name
-    if ($ServiceName -eq "api_service") {
-        Get-Process | Where-Object { $_.ProcessName -eq "python" -and $_.CommandLine -like "*uvicorn*brevo.main*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    # Also kill any lingering processes by port or command line pattern
+    if ($ServiceName -eq $ServiceNameApi) {
+        Write-ColorOutput "Checking for lingering API processes..." $Yellow
+
+        # Kill processes using port
+        try {
+            $connections = netstat -ano | Select-String ":$ApiPort "
+            foreach ($connection in $connections) {
+                if ($connection -match '\s+(\d+)$') {
+                    $pid = $matches[1]
+                    if (Test-ProcessRunning $pid) {
+                        Write-ColorOutput "Killing process using port $ApiPort (PID: $pid)" $Yellow
+                        Kill-ProcessTree $pid
+                    }
+                }
+            }
+        }
+        catch {
+            Write-ColorOutput "Could not check port usage: $($_.Exception.Message)" $Yellow
+        }
+
+        # Kill python uvicorn processes running brevo.main
+        try {
+            Get-Process -Name "python" -ErrorAction SilentlyContinue | ForEach-Object {
+                try {
+                    $procId = $_.Id
+                    $processArgs = (Get-WmiObject Win32_Process -Filter "ProcessId = $procId" -ErrorAction SilentlyContinue).CommandLine
+                    if ($processArgs -and $processArgs -like "*uvicorn*" -and $processArgs -like "*brevo.main*") {
+                        Write-ColorOutput "Killing uvicorn python process (PID: $procId)" $Yellow
+                        Kill-ProcessTree $procId
+                    }
+                }
+                catch {}
+            }
+        }
+        catch {
+            Write-ColorOutput "Could not enumerate uvicorn processes" $Yellow
+        }
     }
-    elseif ($ServiceName -eq "background_service") {
-        Get-Process | Where-Object { $_.ProcessName -eq "python" -and $_.CommandLine -like "*brevo.background_service*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    elseif ($ServiceName -eq $ServiceNameBg) {
+        Write-ColorOutput "Checking for lingering background processes..." $Yellow
+
+        # Kill python background service processes
+        try {
+            Get-Process -Name "python" -ErrorAction SilentlyContinue | ForEach-Object {
+                try {
+                    $procId = $_.Id
+                    $processArgs = (Get-WmiObject Win32_Process -Filter "ProcessId = $procId" -ErrorAction SilentlyContinue).CommandLine
+                    if ($processArgs -and $processArgs -like "*brevo.background_service*") {
+                        Write-ColorOutput "Killing background service process (PID: $procId)" $Yellow
+                        Kill-ProcessTree $procId
+                    }
+                }
+                catch {}
+            }
+        }
+        catch {
+            Write-ColorOutput "Could not enumerate background processes" $Yellow
+        }
+    }
+
+    Start-Sleep -Seconds 2
+
+    if (Test-ServiceRunning $ServiceName) {
+        Write-ColorOutput "WARNING: $ServiceName may still be running" $Yellow
+    }
+    else {
+        Write-ColorOutput "$ServiceName stopped successfully" $Green
+    }
+}
+
+function Stop-AllBrevoProcesses {
+    Write-ColorOutput "Stopping ALL Brevo-related processes..." $Red
+
+    try {
+        # Kill by port first
+        $connections = netstat -ano | Select-String ":$ApiPort "
+        foreach ($connection in $connections) {
+            if ($connection -match '\s+(\d+)$') {
+                $pid = $matches[1]
+                Write-ColorOutput "Killing process on port $ApiPort (PID: $pid)" $Yellow
+                Kill-ProcessTree $pid
+            }
+        }
+
+        # Kill all Brevo-related python processes
+        Get-Process -Name "python" -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $procId = $_.Id
+                $processArgs = (Get-WmiObject Win32_Process -Filter "ProcessId = $procId" -ErrorAction SilentlyContinue).CommandLine
+                if ($processArgs -and ($processArgs -like "*brevo*" -or $processArgs -like "*uvicorn*")) {
+                    Write-ColorOutput "Killing Python process (PID: $procId): $processArgs" $Yellow
+                    Kill-ProcessTree $procId
+                }
+            }
+            catch {}
+        }
+
+        # Clean up PID files
+        Remove-Item "*.pid" -Force -ErrorAction SilentlyContinue
+
+        Write-ColorOutput "All Brevo processes stopped" $Green
+    }
+    catch {
+        Write-ColorOutput "Error during cleanup: $($_.Exception.Message)" $Red
     }
 }
 
 function Start-Services {
     Write-ColorOutput "Starting Brevo Services..." $Blue
     
-    # Check if services are already running
-    if (Test-ServiceRunning "api_service") {
+    if (Test-ServiceRunning $ServiceNameApi) {
         Write-ColorOutput "WARNING: API service is already running. Stopping it first..." $Yellow
-        Stop-Service "api_service"
+        Stop-Service $ServiceNameApi
     }
     
-    
-    if (Test-ServiceRunning "background_service") {
+    if (Test-ServiceRunning $ServiceNameBg) {
         Write-ColorOutput "WARNING: Background service is already running. Stopping it first..." $Yellow
-        Stop-Service "background_service"
+        Stop-Service $ServiceNameBg
     }
     
-    # Check if .env exists
     if (-not (Test-Path ".env")) {
         Write-ColorOutput "Warning: .env file not found. Please create one with BREVO_API_KEY" $Yellow
     }
     
-    # Check if virtual environment is activated
     if (-not $env:VIRTUAL_ENV) {
         Write-ColorOutput "Tip: Consider activating your virtual environment first" $Yellow
     }
     
-    # Start API service
     Write-ColorOutput "Starting API service on port $ApiPort..." $Green
     $apiProcess = Start-Process -FilePath "uvicorn" -ArgumentList "$ApiService", "--host", "0.0.0.0", "--port", "$ApiPort", "--reload" -RedirectStandardOutput "api_service.log" -RedirectStandardError "api_service_error.log" -WindowStyle Hidden -PassThru
     $apiProcess.Id | Out-File -FilePath "api_service.pid" -Encoding UTF8
-    
+
     Start-Sleep -Seconds 2
-    
-    # Start background service
+
     Write-ColorOutput "Starting background service..." $Green
     $bgProcess = Start-Process -FilePath "python" -ArgumentList "-m", "$BackgroundService" -RedirectStandardOutput "background_service.log" -RedirectStandardError "background_service_error.log" -WindowStyle Hidden -PassThru
     $bgProcess.Id | Out-File -FilePath "background_service.pid" -Encoding UTF8
-    
+
     Write-ColorOutput "Services started successfully!" $Green
     Write-ColorOutput "   Log viewer: http://localhost:$ApiPort" $Blue
     Write-ColorOutput "   API docs: http://localhost:$ApiPort/docs" $Blue
     Write-ColorOutput "   API PID: $($apiProcess.Id)" $Blue
     Write-ColorOutput "   Background PID: $($bgProcess.Id)" $Blue
-    
+
     $openBrowser = Read-Host "Open log viewer in browser? [y/N]"
     if ($openBrowser -eq "y" -or $openBrowser -eq "Y") {
         try {
@@ -136,81 +258,84 @@ function Start-Services {
 
 function Stop-Services {
     Write-ColorOutput "Stopping Brevo Services..." $Yellow
-    
-    Stop-Service "api_service"
-    Stop-Service "background_service"
-    
+
+    Stop-Service $ServiceNameApi
+    Stop-Service $ServiceNameBg
+
+    # Nuclear option if anything still alive
+    if ((Test-ServiceRunning $ServiceNameApi) -or (Test-ServiceRunning $ServiceNameBg)) {
+        Write-ColorOutput "Some services still running, using force cleanup..." $Yellow
+        Stop-AllBrevoProcesses
+    }
+
     Write-ColorOutput "All services stopped" $Green
 }
 
 function Show-Status {
     Write-ColorOutput "Brevo Service Status:" $Blue
-    
-    # Check API service
-    if (Test-ServiceRunning "api_service") {
-        $apiProcessId = Get-ServicePID "api_service"
-        Write-ColorOutput "   API Service: Running (PID: $apiProcessId)" $Green
-    } else {
+
+    if (Test-ServiceRunning $ServiceNameApi) {
+        $apiPid = Get-ServicePID $ServiceNameApi
+        Write-ColorOutput "   API Service: Running (PID: $apiPid)" $Green
+    }
+    else {
         Write-ColorOutput "   API Service: Not running" $Red
     }
-    
-    # Check background service
-    if (Test-ServiceRunning "background_service") {
-        $bgProcessId = Get-ServicePID "background_service"
-        Write-ColorOutput "   Background Service: Running (PID: $bgProcessId)" $Green
-    } else {
+
+    if (Test-ServiceRunning $ServiceNameBg) {
+        $bgPid = Get-ServicePID $ServiceNameBg
+        Write-ColorOutput "   Background Service: Running (PID: $bgPid)" $Green
+    }
+    else {
         Write-ColorOutput "   Background Service: Not running" $Red
     }
-    
-    # Check for any lingering processes
+
     Write-Output ""
     Write-ColorOutput "Process Analysis:" $Blue
-    $brevoProcesses = @(Get-Process | Where-Object { 
+
+    $brevoProcs = @(Get-Process | Where-Object {
         ($_.ProcessName -eq "python" -and ($_.CommandLine -like "*uvicorn*brevo*" -or $_.CommandLine -like "*brevo.background_service*")) -or
         ($_.ProcessName -eq "uvicorn" -and $_.CommandLine -like "*brevo*")
     })
-    
-    if ($brevoProcesses.Count -gt 0) {
-        Write-ColorOutput "   Total Brevo-related processes: $($brevoProcesses.Count)" $Blue
-        if ($brevoProcesses.Count -gt 2) {
+
+    if ($brevoProcs.Count -gt 0) {
+        Write-ColorOutput "   Total Brevo-related processes: $($brevoProcs.Count)" $Blue
+        if ($brevoProcs.Count -gt 2) {
             Write-ColorOutput "   WARNING: Multiple processes detected. Consider running stop first." $Yellow
         }
-    } else {
+    }
+    else {
         Write-ColorOutput "   No Brevo processes found" $Blue
     }
-    
+
     Write-ColorOutput "   Log viewer: http://localhost:$ApiPort" $Blue
-    
-    # Show system info
-    $memory = [math]::Round((Get-Process python -ErrorAction SilentlyContinue | Measure-Object WorkingSet -Sum).Sum / 1MB, 2)
-    if ($memory -gt 0) {
-        Write-ColorOutput "   Python Memory Usage: ${memory}MB" $Blue
+
+    $memUsage = [math]::Round((Get-Process python -ErrorAction SilentlyContinue | Measure-Object WorkingSet -Sum).Sum / 1MB, 2)
+    if ($memUsage -gt 0) {
+        Write-ColorOutput "   Python Memory Usage: ${memUsage}MB" $Blue
     }
 }
 
 function Restart-Services {
     Write-ColorOutput "Restarting Brevo Services..." $Blue
-    
-    # Stop services
-    Stop-Service "api_service"
-    Stop-Service "background_service"
-    
+
+    Stop-Service $ServiceNameApi
+    Stop-Service $ServiceNameBg
+
     Start-Sleep -Seconds 2
-    
-    # Check if .env exists
+
     if (-not (Test-Path ".env")) {
         Write-ColorOutput "Warning: .env file not found. Please create one with BREVO_API_KEY" $Yellow
     }
-    
-    # Start services
+
     Write-ColorOutput "Starting API service on port $ApiPort..." $Green
     $apiProcess = Start-Process -FilePath "uvicorn" -ArgumentList "$ApiService", "--host", "0.0.0.0", "--port", "$ApiPort", "--reload" -RedirectStandardOutput "api_service.log" -RedirectStandardError "api_service_error.log" -WindowStyle Hidden -PassThru
     $apiProcess.Id | Out-File -FilePath "api_service.pid" -Encoding UTF8
-    
+
     Write-ColorOutput "Starting background service..." $Green
     $bgProcess = Start-Process -FilePath "python" -ArgumentList "-m", "$BackgroundService" -RedirectStandardOutput "background_service.log" -RedirectStandardError "background_service_error.log" -WindowStyle Hidden -PassThru
     $bgProcess.Id | Out-File -FilePath "background_service.pid" -Encoding UTF8
-    
+
     Write-ColorOutput "Services restarted successfully!" $Green
     Write-ColorOutput "   Log viewer: http://localhost:$ApiPort" $Blue
     Write-ColorOutput "   API docs: http://localhost:$ApiPort/docs" $Blue
@@ -220,14 +345,14 @@ function Restart-Services {
 
 function Show-Logs {
     Write-ColorOutput "Viewing service logs (Ctrl+C to exit)..." $Blue
-    
+
     $logFiles = @("api_service.log", "background_service.log", "brevo_service.log") | Where-Object { Test-Path $_ }
-    
+
     if ($logFiles.Count -eq 0) {
         Write-ColorOutput "No log files found yet" $Yellow
         return
     }
-    
+
     try {
         Get-Content $logFiles -Wait
     }
@@ -238,15 +363,13 @@ function Show-Logs {
 
 function Install-Service {
     Write-ColorOutput "📦 Installing Brevo Service as Windows Service..." $Blue
-    
-    # Check if running as administrator
+
     if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
         Write-ColorOutput "❌ This operation requires administrator privileges" $Red
         Write-ColorOutput "Please run PowerShell as Administrator and try again" $Yellow
         return
     }
-    
-    # Install as Windows Service using NSSM (if available) or create scheduled task
+
     if (Get-Command nssm -ErrorAction SilentlyContinue) {
         Write-ColorOutput "Using NSSM to install Windows Service..." $Green
         $currentDir = Get-Location
@@ -255,9 +378,9 @@ function Install-Service {
         nssm install "BrevoBackground" "python" "-m $BackgroundService"
         nssm set "BrevoBackground" AppDirectory "$currentDir"
         Write-ColorOutput "Services installed. Use sc start BrevoAPI and sc start BrevoBackground to start them" $Green
-    } else {
+    }
+    else {
         Write-ColorOutput "Creating scheduled tasks instead..." $Yellow
-        # Create scheduled tasks as fallback
         $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-File `"$PWD\run_service.ps1`" start"
         $trigger = New-ScheduledTaskTrigger -AtStartup
         Register-ScheduledTask -TaskName "BrevoService" -Action $action -Trigger $trigger -Description "Brevo Background Service"
@@ -267,14 +390,14 @@ function Install-Service {
 
 function Uninstall-Service {
     Write-ColorOutput "Uninstalling Brevo Service..." $Yellow
-    
+
     if (Get-Command nssm -ErrorAction SilentlyContinue) {
         nssm stop "BrevoAPI"
         nssm stop "BrevoBackground"
         nssm remove "BrevoAPI" confirm
         nssm remove "BrevoBackground" confirm
     }
-    
+
     Unregister-ScheduledTask -TaskName "BrevoService" -Confirm:$false -ErrorAction SilentlyContinue
     Write-ColorOutput "Service uninstalled" $Green
 }
@@ -284,32 +407,24 @@ function Show-Help {
     Write-Host "Usage: .\run_service.ps1 [start|stop|restart|status|logs|install|uninstall]"
     Write-Host ""
     Write-Host "Commands:"
-    Write-Host "  start     - Start both API and background services (stops existing if running)"
-    Write-Host "  stop      - Stop all services"
-    Write-Host "  restart   - Stop and start services"
-    Write-Host "  status    - Check service status and process count"
-    Write-Host "  logs      - View live logs"
-    Write-Host "  install   - Install as Windows service (requires admin)"
-    Write-Host "  uninstall - Remove Windows service (requires admin)"
-    Write-Host ""
-    Write-Host "Examples:"
-    Write-Host "  .\run_service.ps1 start    # Start services"
-    Write-Host "  .\run_service.ps1 restart  # Cleanly restart services"
-    Write-Host "  .\run_service.ps1 status   # Check if running"
-    Write-Host "  .\run_service.ps1 logs     # Monitor logs"
-    Write-Host "  .\run_service.ps1 stop     # Stop services"
-    Write-Host ""
-    Write-ColorOutput "Pro tip: Run as Administrator for Windows Service installation" $Yellow
+    Write-Host "  start     - Start both API and background services (stops existing ones first)"
+    Write-Host "  stop      - Stop both API and background services gracefully"
+    Write-Host "  restart   - Restart services"
+    Write-Host "  status    - Show current status of services"
+    Write-Host "  logs      - Tail service logs"
+    Write-Host "  install   - Install as Windows service (requires admin & NSSM)"
+    Write-Host "  uninstall - Remove installed Windows service"
+    Write-Host "  help      - Show this help message"
 }
 
-# Main execution
 switch ($Action) {
-    "start" { Start-Services }
-    "stop" { Stop-Services }
+    "start"   { Start-Services }
+    "stop"    { Stop-Services }
     "restart" { Restart-Services }
-    "status" { Show-Status }
-    "logs" { Show-Logs }
+    "status"  { Show-Status }
+    "logs"    { Show-Logs }
     "install" { Install-Service }
     "uninstall" { Uninstall-Service }
-    default { Show-Help }
-} 
+    default   { Show-Help }
+}
+
