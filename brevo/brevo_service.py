@@ -34,40 +34,103 @@ class MockResponse:
         self.text = text
 
 
-
 def get_existing_contacts_email():
-    url = "https://api.brevo.com/v3/contacts"
-    response = requests.get(url, headers=HEADERS)
-    response.raise_for_status()
-    data = response.json()
-
-    logging.info("Fetched existing contacts from Brevo API.")
-    return {contact["email"].lower() for contact in data.get("contacts", [])}
+    all_contacts = set()
+    offset = 0
+    limit = 1000 
+    
+    logging.info("Starting to fetch all existing contacts...")
+    
+    while True:
+        url = f"https://api.brevo.com/v3/contacts?limit={limit}&offset={offset}"
+        
+        try:
+            response = requests.get(url, headers=HEADERS)
+            response.raise_for_status()
+            data = response.json()
+            
+            contacts = data.get("contacts", [])
+            
+            if not contacts:
+                break
+            
+            for contact in contacts:
+                email = contact.get("email")
+                if email:
+                    all_contacts.add(email.lower())
+            
+            logging.info(f"Fetched {len(contacts)} contacts (offset: {offset}). Total so far: {len(all_contacts)}")
+            
+            if len(contacts) < limit:
+                break
+                
+            offset += limit
+            
+            time.sleep(0.1)
+            
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching contacts at offset {offset}: {str(e)}")
+            break
+        except Exception as e:
+            logging.error(f"Unexpected error fetching contacts at offset {offset}: {str(e)}")
+            break
+    
+    logging.info(f"Finished fetching contacts. Total: {len(all_contacts)} unique emails found")
+    return all_contacts
 
 
 def get_detailed_contacts():
-    url = "https://api.brevo.com/v3/contacts"
-    response = requests.get(url, headers=HEADERS)
-    response.raise_for_status()
-    data = response.json()
+    all_contacts = []
+    offset = 0
+    limit = 1000  # Maximum allowed by Brevo for contacts endpoint
+    
+    logging.info("Starting to fetch all detailed contacts...")
+    
+    while True:
+        url = f"https://api.brevo.com/v3/contacts?limit={limit}&offset={offset}"
+        
+        try:
+            response = requests.get(url, headers=HEADERS)
+            response.raise_for_status()
+            data = response.json()
+            
+            contacts = data.get("contacts", [])
+            
+            if not contacts:
+                break
+            
+            for contact in contacts:
+                contact_info = {
+                    "id": contact.get("id"),
+                    "email": contact.get("email"),
+                    "emailBlacklisted": contact.get("emailBlacklisted", False),
+                    "smsBlacklisted": contact.get("smsBlacklisted", False),
+                    "createdAt": contact.get("createdAt"),
+                    "modifiedAt": contact.get("modifiedAt"),
+                    "listIds": contact.get("listIds", []),
+                    "attributes": contact.get("attributes", {}),
+                }
+                all_contacts.append(contact_info)
+            
+            logging.info(f"Fetched {len(contacts)} detailed contacts (offset: {offset}). Total so far: {len(all_contacts)}")
+            
+            if len(contacts) < limit:
+                break
+                
+            offset += limit
+            
+            time.sleep(0.1)
+            
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error fetching detailed contacts at offset {offset}: {str(e)}")
+            break
+        except Exception as e:
+            logging.error(f"Unexpected error fetching detailed contacts at offset {offset}: {str(e)}")
+            break
+    
+    logging.info(f"Finished fetching detailed contacts. Total: {len(all_contacts)} contacts found")
+    return all_contacts
 
-    logging.info("Fetched detailed contacts from Brevo API.")
-
-    contacts = []
-    for contact in data.get("contacts", []):
-        contact_info = {
-            "id": contact.get("id"),
-            "email": contact.get("email"),
-            "emailBlacklisted": contact.get("emailBlacklisted", False),
-            "smsBlacklisted": contact.get("smsBlacklisted", False),
-            "createdAt": contact.get("createdAt"),
-            "modifiedAt": contact.get("modifiedAt"),
-            "listIds": contact.get("listIds", []),
-            "attributes": contact.get("attributes", {}),
-        }
-        contacts.append(contact_info)
-
-    return contacts
 
 def add_contact(email: str, existing_contacts: set, list_ids=None, contact_data=None):
     if not API_KEY:
@@ -111,6 +174,7 @@ def build_attributes(contact_data: dict | None) -> dict:
         "vendor_name": "COMPANY_NAME",
         "company_id": "COMPANY_ID",
         "phone": "SMS",
+        "tender_code": "TENDER_CODE"
     }
 
     for key, value in contact_data.items():
@@ -215,7 +279,6 @@ def load_html_template(filename: str) -> str:
 
 
 def create_new_campaign(list_id: int) -> dict:
-    """Create a new email campaign for the given list ID"""
     url = "https://api.brevo.com/v3/emailCampaigns"
 
     html_content = load_html_template("message_template.html")
@@ -351,6 +414,7 @@ def extract_contact_data(row: dict) -> dict:
         "VendorName": "vendor_name",
         "IdCode": "company_id",
         "Phone": "phone",
+        "CATEGORY": "tender_code"
     }
     contact_data = {}
     for csv_col, field_name in csv_field_mapping.items():
@@ -360,19 +424,33 @@ def extract_contact_data(row: dict) -> dict:
     return contact_data
 
 def process_contact(email: str, contact_data: dict, existing_emails: set, results: dict, campaign_list_id: int):
-    """Process a single contact and add to campaign list if new"""
     if email in existing_emails:
-        update_existing_contact(email, contact_data, results)
+        update_existing_contact(email, contact_data, results, existing_emails)
     else:
         create_new_contact_for_campaign(email, contact_data, existing_emails, results, campaign_list_id)
 
-def update_existing_contact(email: str, contact_data: dict, results: dict):
-    resp = add_contact(email, get_existing_contacts_email(), contact_data=contact_data)
+
+def update_existing_contact(email: str, contact_data: dict, results: dict, existing_emails: set):
+    detailed_contacts = get_detailed_contacts()
+    existing = next((c for c in detailed_contacts if c["email"].lower() == email), None)
+
+    if existing:
+        old_code = existing.get("attributes", {}).get("CATEGORY", "")
+        new_code = contact_data.get("vendor_code", "")
+        if new_code and old_code and new_code != old_code:
+            contact_data["vendor_code"] = f"{new_code};{old_code}"
+            logging.info(f"Updated vendor_code for {email}: {contact_data['vendor_code']}")
+
+    resp = add_contact(email, existing_emails, contact_data=contact_data)
     if resp and resp.status_code in (201, 204):
         results["updated_contacts"].append({"email": email, "data": contact_data})
         logging.info(f"Existing contact {email} updated but not added to campaign")
     else:
-        results["errors"].append({"email": email, "error": f"Failed to update contact: {resp.text if resp else 'No response'}"})
+        results["errors"].append({
+            "email": email, 
+            "error": f"Failed to update contact: {resp.text if resp else 'No response'}"
+        })
+
 
 def create_new_contact_for_campaign(email: str, contact_data: dict, existing_emails: set, results: dict, campaign_list_id: int):
     resp = add_contact(email, existing_emails, list_ids=[campaign_list_id], contact_data=contact_data)
@@ -384,20 +462,29 @@ def create_new_contact_for_campaign(email: str, contact_data: dict, existing_ema
     else:
         results["errors"].append({"email": email, "error": (resp.text if resp else "No response")})
 
+
 def handle_csv(file_bytes: bytes):
     decoded = file_bytes.decode("utf-8")
     reader = csv.DictReader(io.StringIO(decoded))
     
+    logging.info("Fetching all existing contacts from Brevo...")
+    
     existing_contacts_email = get_existing_contacts_email()
+    
+    logging.info(f"Found {len(existing_contacts_email)} existing contacts in your Brevo account")
+    
     results = {
         "added_to_campaign": [], 
         "updated_contacts": [], 
         "errors": [],
-        "campaign_info": {}
+        "campaign_info": {},
+        "total_existing_contacts": len(existing_contacts_email) 
     }
 
     logging.info("Creating new campaign for CSV import...")
+    
     campaign_result = create_new_campaign(CAMPAIGN_LIST_ID)
+    
     results["campaign_info"] = campaign_result
     
     if not campaign_result["success"]:
@@ -406,6 +493,7 @@ def handle_csv(file_bytes: bytes):
         return results
 
     campaign_id = campaign_result["campaign_id"]
+    
     logging.info(f"Campaign created with ID: {campaign_id}")
 
     for row in reader:
@@ -420,8 +508,8 @@ def handle_csv(file_bytes: bytes):
         except Exception as e:
             results["errors"].append({"email": email, "error": str(e)})
 
-    if results["added_to_campaign"]:
         logging.info(f"Sending campaign to {len(results['added_to_campaign'])} new contacts...")
+        time.sleep(2)
         send_result = send_campaign_to_contacts(campaign_id)
         results["campaign_info"]["send_result"] = send_result
         
@@ -434,3 +522,4 @@ def handle_csv(file_bytes: bytes):
         results["campaign_info"]["send_result"] = {"success": False, "message": "No new contacts to send to"}
 
     return results
+

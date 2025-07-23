@@ -8,7 +8,7 @@ import os
 import platform
 from datetime import datetime, timedelta
 from pathlib import Path
-from .brevo_service import get_existing_contacts, handle_csv, send_info_email_campaign
+from .brevo_service import get_existing_contacts_email, handle_csv, send_info_email_campaign
 
 log_file = Path("brevo_service.log")
 logging.basicConfig(
@@ -149,7 +149,7 @@ class BrevoBackgroundService:
                 logger.warning("BREVO_API_KEY not configured")
                 return False
 
-            contacts = get_existing_contacts()
+            contacts = get_existing_contacts_email()
             logger.info(f"Health check passed - {len(contacts)} contacts found")
             return True
 

@@ -107,7 +107,7 @@ async def get_all_users(detailed: bool = False):
             contacts = get_detailed_contacts()
             return {"total_contacts": len(contacts), "contacts": contacts}
         else:
-            existing_contacts = get_existing_contacts()
+            existing_contacts = get_existing_contacts_email()
             return {
                 "total_contacts": len(existing_contacts),
                 "contacts": sorted(list(existing_contacts)),
