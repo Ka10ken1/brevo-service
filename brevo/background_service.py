@@ -8,7 +8,11 @@ import os
 import platform
 from datetime import datetime, timedelta
 from pathlib import Path
-from .brevo_service import get_existing_contacts_email, handle_csv, send_info_email_campaign
+from brevo_service import (
+    get_existing_contacts_email,
+    handle_csv,
+    send_info_email_campaign,
+)
 
 log_file = Path("brevo_service.log")
 logging.basicConfig(
@@ -41,7 +45,44 @@ class BrevoBackgroundService:
             raise ValueError("CSV_BASE_PATH environment variable is required")
 
         self._setup_directories()
+        if not self._validate_path():
+            logger.error(
+                "Required CSV path or expected file format is invalid. Stopping service."
+            )
+            raise SystemExit(1)
+
         self._log_configuration()
+
+    def _validate_path(self) -> bool:
+        base_path = Path(self.csv_base_path)
+
+        if not base_path.exists():
+            logger.error(f"Base CSV directory does not exist: {base_path}")
+            return False
+
+        try:
+            expected_csv_path = self._generate_csv_path(datetime.now())
+        except Exception as e:
+            logger.error(f"Error generating expected CSV path: {str(e)}")
+            return False
+
+        if not expected_csv_path.exists():
+            logger.error(f"Expected CSV file does not exist: {expected_csv_path}")
+            return False
+
+        if expected_csv_path.stat().st_size == 0:
+            logger.error(f"Expected CSV file is empty: {expected_csv_path}")
+            return False
+
+        try:
+            with expected_csv_path.open("r", encoding="utf-8") as f:
+                # Read one line to verify it's readable
+                f.readline()
+        except Exception as e:
+            logger.error(f"CSV file is not readable: {expected_csv_path} - {str(e)}")
+            return False
+
+        return True
 
     def _setup_directories(self):
         if self.platform == "Windows":
@@ -61,7 +102,6 @@ class BrevoBackgroundService:
         logger.info(f"  - Today's Expected Path: {example_path}")
 
     def _generate_csv_path(self, date: datetime) -> Path:
-        """Generate the CSV file path for a given date"""
         date_str = date.strftime("%Y%m%d")
         filename = self.csv_filename_pattern.format(date=date_str)
         filename += self.csv_file_extension
@@ -69,7 +109,6 @@ class BrevoBackgroundService:
         return Path(self.csv_base_path) / filename
 
     def _find_csv_file_for_date(self, date: datetime) -> Path:
-        """Find CSV file for a specific date"""
         expected_path = self._generate_csv_path(date)
 
         if expected_path.exists():
@@ -244,7 +283,9 @@ class BrevoBackgroundService:
                     if campaign_response.status_code in (201, 202):
                         logger.info("Campaign created and sent successfully")
                     else:
-                        logger.warning(f"Campaign creation failed: {campaign_response.status_code} - {campaign_response.text}")
+                        logger.warning(
+                            f"Campaign creation failed: {campaign_response.status_code} - {campaign_response.text}"
+                        )
                 except Exception as e:
                     logger.error(f"Error creating campaign: {str(e)}")
             else:
@@ -324,7 +365,7 @@ class BrevoBackgroundService:
         schedule.every().day.at("09:00").do(self.send_daily_report)
 
         # run at georgian 11:00 AM time
-        schedule.every(1).minutes.do(self._run_at_georgian_time())
+        schedule.every(1).minutes.do(self._run_at_georgian_time)
 
         logger.info("Background service started successfully")
         logger.info("Scheduled tasks:")
