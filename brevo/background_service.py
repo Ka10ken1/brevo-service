@@ -46,10 +46,9 @@ class BrevoBackgroundService:
 
         self._setup_directories()
         if not self._validate_path():
-            logger.error(
-                "Required CSV path or expected file format is invalid. Stopping service."
+            logger.warning(
+                "Required CSV path or expected file format is invalid. Continuing service and will retry later."
             )
-            raise SystemExit(1)
 
         self._log_configuration()
 

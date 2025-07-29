@@ -589,6 +589,7 @@ def handle_csv(file_bytes: bytes):
     for row in reader:
         email = extract_email(row)
         if not email:
+            logging.warning(f"Skipping row with missing/invalid email: {row}")
             continue
 
         contact_data = extract_contact_data(row)
