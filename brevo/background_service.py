@@ -3,7 +3,6 @@
 import time
 import logging
 import schedule
-from zoneinfo import ZoneInfo
 import os
 import platform
 from datetime import datetime, timedelta
@@ -23,8 +22,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-GEORGIAN_TZ = ZoneInfo("Asia/Tbilisi")
 
 
 class BrevoBackgroundService:
@@ -107,7 +104,7 @@ class BrevoBackgroundService:
 
         return Path(self.csv_base_path) / filename
 
-    def _find_csv_file_for_date(self, date: datetime) -> Path:
+    def _find_csv_file_for_date(self, date: datetime) -> Path | None:
         expected_path = self._generate_csv_path(date)
 
         if expected_path.exists():
@@ -115,21 +112,6 @@ class BrevoBackgroundService:
             return expected_path
         else:
             logger.warning(f"Expected CSV file not found: {expected_path}")
-
-            base_path = Path(self.csv_base_path)
-            if base_path.exists():
-                all_csv_files = list(base_path.glob("*.csv"))
-                if all_csv_files:
-                    logger.info(f"Available CSV files in {base_path}:")
-                    for file in sorted(all_csv_files[-5:]):  # Show last 5 files
-                        logger.info(f"  - {file.name}")
-                    if len(all_csv_files) > 5:
-                        logger.info(f"  ... and {len(all_csv_files) - 5} more files")
-                else:
-                    logger.warning(f"No CSV files found in base directory: {base_path}")
-            else:
-                logger.error(f"Base CSV directory does not exist: {base_path}")
-
             return None
 
     def test_dynamic_path_configuration(self):
@@ -212,7 +194,9 @@ class BrevoBackgroundService:
                 csv_file = self._find_csv_file_for_date(yesterday)
 
             if not csv_file:
-                logger.warning("No CSV file found for processing")
+                logger.info(
+                    "No CSV file found for processing. Will check again tomorrow."
+                )
                 return
 
             logger.info(f"Processing CSV file: {csv_file}")
@@ -350,7 +334,7 @@ class BrevoBackgroundService:
         self.daily_csv_processing()
 
     def _run_at_georgian_time(self):
-        now = datetime.now(tz=GEORGIAN_TZ)
+        now = datetime.now()
         if now.hour == 3 and now.minute == 0:
             logger.info("Georgian time is 3:00 - running daily_csv_processing")
             self.daily_csv_processing()
@@ -359,19 +343,20 @@ class BrevoBackgroundService:
         self.running = True
         logger.info("Starting Brevo Background Service...")
 
+        # Schedule tasks
         schedule.every(5).minutes.do(self.health_check)
         schedule.every().hour.do(self.cleanup_logs)
         schedule.every().day.at("09:00").do(self.send_daily_report)
 
-        # run at georgian 3:00 AM time
-        schedule.every(1).minutes.do(self._run_at_georgian_time)
+        # Schedule daily CSV processing at 3:00 AM Georgian time
+        schedule.every().day.at("02:00").do(self.daily_csv_processing)
 
         logger.info("Background service started successfully")
         logger.info("Scheduled tasks:")
-        logger.info("  - Health check: Every 5 minutes")
-        logger.info("  - Log cleanup: Every hour")
-        logger.info("  - Daily report: 09:00 daily")
-        logger.info("  - Daily CSV processing: 3:00 daily")
+        logger.info(" - Health check: Every 5 minutes")
+        logger.info(" - Log cleanup: Every hour")
+        logger.info(" - Daily report: 09:00 daily")
+        logger.info(" - Daily CSV processing: 3:00 AM Georgian time daily")
 
         self.health_check()
 
@@ -379,7 +364,6 @@ class BrevoBackgroundService:
             while self.running:
                 schedule.run_pending()
                 time.sleep(30)
-
         except KeyboardInterrupt:
             logger.info("Received shutdown signal")
             self.stop()

@@ -200,12 +200,7 @@ def build_attributes(contact_data: dict | None) -> dict:
 
     for key, value in contact_data.items():
         if value and key in field_mapping:
-            if key == "phone":
-                phone = normalize_georgian_phone(value)
-                if phone:
-                    attributes[field_mapping[key]] = phone
-            else:
-                attributes[field_mapping[key]] = value
+            attributes[field_mapping[key]] = value
 
     return attributes
 
@@ -606,19 +601,19 @@ def handle_csv(file_bytes: bytes):
         except Exception as e:
             results["errors"].append({"email": email, "error": str(e)})
 
-    if results["added_to_campaign"]:
-        send_result = send_campaign_to_contacts(campaign_id)
-        results["campaign_info"]["send_result"] = send_result
-
-        if send_result["success"]:
-            logging.info("Campaign sent successfully to all new contacts!")
-        else:
-            logging.error(f"Failed to send campaign: {send_result['error']}")
-    else:
-        logging.info("No new contacts were added, so campaign was not sent.")
-        results["campaign_info"]["send_result"] = {
-            "success": False,
-            "message": "No new contacts to send to",
-        }
+    # if results["added_to_campaign"]:
+    #     send_result = send_campaign_to_contacts(campaign_id)
+    #     results["campaign_info"]["send_result"] = send_result
+    #
+    #     if send_result["success"]:
+    #         logging.info("Campaign sent successfully to all new contacts!")
+    #     else:
+    #         logging.error(f"Failed to send campaign: {send_result['error']}")
+    # else:
+    #     logging.info("No new contacts were added, so campaign was not sent.")
+    #     results["campaign_info"]["send_result"] = {
+    #         "success": False,
+    #         "message": "No new contacts to send to",
+    #     }
 
     return results
