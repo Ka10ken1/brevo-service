@@ -7,11 +7,7 @@ import os
 import platform
 from datetime import datetime, timedelta
 from pathlib import Path
-from brevo_service import (
-    get_existing_contacts_email,
-    handle_csv,
-    send_info_email_campaign,
-)
+from brevo_service import get_existing_contacts_email, handle_csv
 
 log_file = Path("brevo_service.log")
 logging.basicConfig(
@@ -187,13 +183,6 @@ class BrevoBackgroundService:
             csv_file = self._find_csv_file_for_date(today)
 
             if not csv_file:
-                yesterday = today - timedelta(days=1)
-                logger.info(
-                    f"No file found for today, trying yesterday ({yesterday.strftime('%Y-%m-%d')})"
-                )
-                csv_file = self._find_csv_file_for_date(yesterday)
-
-            if not csv_file:
                 logger.info(
                     "No CSV file found for processing. Will check again tomorrow."
                 )
@@ -259,18 +248,6 @@ class BrevoBackgroundService:
                 if total_errors > 5:
                     logger.warning(f"  ... and {total_errors - 5} more errors")
 
-            if total_processed > 0:
-                logger.info("Creating and sending campaign to processed contacts...")
-                try:
-                    campaign_response = send_info_email_campaign()
-                    if campaign_response.status_code in (201, 202):
-                        logger.info("Campaign created and sent successfully")
-                    else:
-                        logger.warning(
-                            f"Campaign creation failed: {campaign_response.status_code} - {campaign_response.text}"
-                        )
-                except Exception as e:
-                    logger.error(f"Error creating campaign: {str(e)}")
             else:
                 logger.info("No contacts were processed, skipping campaign creation")
 
@@ -336,7 +313,7 @@ class BrevoBackgroundService:
     def _run_at_georgian_time(self):
         now = datetime.now()
         if now.hour == 3 and now.minute == 0:
-            logger.info("Georgian time is 3:00 - running daily_csv_processing")
+            logger.info("Georgian time is 2:00 - running daily_csv_processing")
             self.daily_csv_processing()
 
     def start(self):
@@ -348,15 +325,15 @@ class BrevoBackgroundService:
         schedule.every().hour.do(self.cleanup_logs)
         schedule.every().day.at("09:00").do(self.send_daily_report)
 
-        # Schedule daily CSV processing at 3:00 AM Georgian time
-        schedule.every().day.at("02:00").do(self.daily_csv_processing)
+        # Schedule daily CSV processing at 2:00 PM
+        schedule.every().day.at("14:00").do(self.daily_csv_processing)
 
         logger.info("Background service started successfully")
         logger.info("Scheduled tasks:")
         logger.info(" - Health check: Every 5 minutes")
         logger.info(" - Log cleanup: Every hour")
         logger.info(" - Daily report: 09:00 daily")
-        logger.info(" - Daily CSV processing: 3:00 AM Georgian time daily")
+        logger.info(" - Daily CSV processing: 2:00 AM ")
 
         self.health_check()
 

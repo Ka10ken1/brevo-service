@@ -1,534 +1,225 @@
 <!DOCTYPE html>
 <html lang="ka">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>თარგმნის სახლი - სპეციალური შეთავაზება</title>
-        <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+<head>
+    <meta charset="UTF-8">
+    <title>თარგმნის სახლი - სპეციალური შეთავაზება</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
             background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
         }
-
         .email-container {
             max-width: 800px;
-            margin: 0 auto;
-            background-color: white;
+            margin: auto;
+            background: white;
             box-shadow: 0 0 20px rgba(0,0,0,0.1);
         }
-
         .header {
             background: linear-gradient(135deg, #24505a, #1e434c);
-            padding: 20px;
             color: white;
+            padding: 20px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
         }
-
         .logo {
-            width: 120px;
-            height: auto;
-            background-color: rgba(255,255,255,0.1);
-            padding: 5px;
-            border-radius: 5px;
-            flex-shrink: 0;
+            width: 100px;
+            margin-right: 20px;
         }
-
-        .header-content {
-            text-align: center;
-            flex: 1;
-            margin-left: 20px;
+        .header-content h1 {
+            margin: 0;
+            font-size: 2em;
         }
-
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        .header-content p {
+            margin: 5px 0 0;
         }
-
-        .header p {
-            font-size: 1.2em;
-            opacity: 0.9;
-        }
-
         .content {
-            padding: 40px 30px;
-        }
-
-        .special-offer {
-            background: linear-gradient(135deg, #e8f2f4, #f0f6f7);
-            border: 2px solid #24505a;
             padding: 30px;
-            margin: 30px 0;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(36, 80, 90, 0.1);
         }
-
+        .special-offer {
+            background: #e8f2f4;
+            border: 2px solid #24505a;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
         .special-offer h2 {
             color: #24505a;
-            font-size: 1.8em;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             text-align: center;
         }
-
         .offer-list {
             list-style: none;
-            margin: 20px 0;
+            padding: 0;
         }
-
         .offer-list li {
-            padding: 8px 0;
-            font-size: 0.85em;
-            display: flex;
-            align-items: center;
-            line-height: 1.3;
+            margin: 10px 0;
+            padding-left: 20px;
+            position: relative;
         }
-
-        .offer-list li strong {
-            color: #038211;
-        }
-
         .offer-list li::before {
             content: "✓";
+            position: absolute;
+            left: 0;
             color: #24505a;
             font-weight: bold;
-            font-size: 1.3em;
-            margin-right: 10px;
         }
-
-        .price-section {
-            margin: 40px 0;
+        .btn {
+            display: inline-block;
+            margin: 10px 5px 0;
+            padding: 12px 24px;
+            background-color: #ffb400;
+            color: #1e1e1e;
+            text-decoration: none;
+            font-weight: bold;
+            border-radius: 8px;
         }
-
-        .price-section h2 {
+        .btn-secondary {
+            background: white;
             color: #24505a;
-            font-size: 1.8em;
-            text-align: center;
-            margin-bottom: 30px;
+            border: 2px solid #24505a;
         }
-
+        .price-section h2,
+        .why-choose h2,
+        .languages h2 {
+            color: #24505a;
+            text-align: center;
+        }
         .price-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .price-table-container {
-            overflow-x: auto;
-            margin: 20px 0;
-        }
-
-        .price-table th {
-            background: linear-gradient(135deg, #24505a, #1e434c);
-            color: white;
-            padding: 15px 10px;
-            text-align: center;
-            font-weight: bold;
-        }
-
-        .price-table td {
-            padding: 15px 10px;
-            text-align: center;
-            border-bottom: 1px solid #eee;
-        }
-
-        .price-table tr:hover {
-            background-color: #f8f9fa;
-        }
-
-        .country-flag {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            font-size: 1.5em;
-        }
-
-        .flag {
-            width: 30px;
-            height: 20px;
-            border-radius: 3px;
-            display: inline-block;
-        }
-
-        .flag.uk {
-            background: linear-gradient(to bottom, #012169 33%, white 33%, white 66%, #C8102E 66%);
-            position: relative;
-        }
-
-        .flag.turkey {
-            background: #E30A17;
-            position: relative;
-        }
-
-        .flag.germany {
-            background: linear-gradient(to bottom, #000 33%, #DD0000 33%, #DD0000 66%, #FFCE00 66%);
-        }
-
-        .flag.china {
-            background: #DE2910;
-        }
-
-        .price {
-            font-weight: bold;
-            color: #24505a;
-            font-size: 1.1em;
-        }
-
-        .why-choose {
-            background: #f8f9fa;
-            padding: 30px;
-            border-radius: 10px;
-            margin: 30px 0;
-        }
-
-        .why-choose h2 {
-            color: #24505a;
-            margin-bottom: 20px;
-            font-size: 1.8em;
-        }
-
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
             margin-top: 20px;
         }
-
-        .feature {
+        .price-table th,
+        .price-table td {
+            border: 1px solid #ccc;
+            padding: 10px;
             text-align: center;
-            padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-
-        .feature h3 {
-            color: #24505a;
-            margin-bottom: 10px;
-        }
-
+        .why-choose,
         .languages {
             background: #f8f9fa;
-            padding: 30px;
+            padding: 20px;
             border-radius: 10px;
             margin: 30px 0;
         }
-
-        .languages h2 {
-            color: #24505a;
-            margin-bottom: 20px;
-            font-size: 1.8em;
-        }
-
         .language-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
         }
-
         .language {
             background: white;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-            color: #24505a;
+            padding: 10px 15px;
+            border-radius: 5px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-
         .contact-section {
             background: linear-gradient(135deg, #24505a, #1e434c);
             color: white;
-            padding: 40px 30px;
+            padding: 30px;
             text-align: center;
         }
-
-        .contact-section h2 {
-            font-size: 2em;
-            margin-bottom: 20px;
-        }
-
-        .contact-info {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
-            margin: 30px 0;
-        }
-
-        .contact-person {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 10px;
-            backdrop-filter: blur(10px);
-        }
-
-        .contact-person h3 {
-            font-size: 1.3em;
-            margin-bottom: 10px;
-        }
-
         .footer {
             background: #333;
             color: white;
             text-align: center;
-            padding: 30px;
+            padding: 20px;
         }
+    </style>
+</head>
+<body>
+<div class="email-container">
+    <div class="header">
+        <img src="https://th.com.ge/assets/images/logo.jpg" alt="თარგმნის სახლი" class="logo">
+        <div class="header-content">
+            <h1>თარგმნის სახლი</h1>
+            <p>სატენდერო დოკუმენტების თარგმნა და ნოტარიული დამოწმება</p>
+        </div>
+    </div>
+    <div class="content">
+        <p style="font-size: 1.1em;">თუ თქვენი კომპანია <strong>სახელმწიფო შესყიდვებში მონაწილეობს</strong>, გთავაზობთ სპეციალურ პირობებს დოკუმენტაციის თარგმნისთვის.</p>
+        <div class="special-offer">
+            <h2>სპეციალური შეთავაზება თქვენთვის:</h2>
+            <ul class="offer-list">
+                <li><strong>10%-იანი ფასდაკლება</strong> პირველ თარგმანზე</li>
+                <li><strong>დაჩქარებული შესრულება</strong> – დროული მიწოდება გარანტირებულია</li>
+                <li><strong>პერსონალური მენეჯერი</strong> თქვენი პროექტისთვის</li>
+            </ul>
+        </div>
 
-        .btn {
-            display: inline-block;
-            background-color: #ffb400; /* Bright amber */
-            color: #1e1e1e;
-            padding: 14px 28px;
-            font-size: 1.05em;
-            font-weight: bold;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            text-align: center;
-            text-decoration: none;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-            transition: background-color 0.3s ease, transform 0.2s ease;
-        }
+        <!-- Call to Action -->
+        <div style="text-align: center;">
+            <a href="https://wa.me/995568420553" class="btn">💬 მომწერეთ WhatsApp-ზე</a>
+            <a href="tel:+995568420553" class="btn btn-secondary">📞 დარეკვა ახლა</a>
+            <p style="font-size: 0.9em; margin-top: 10px;">დავიწყოთ დღესვე თქვენი თარგმნის პროცესი</p>
+        </div>
 
-        .btn:hover {
-            background-color: #e69f00;
-            transform: translateY(-2px);
-        }
+        <div class="price-section">
+            <h2>ფასთა ცხრილი</h2>
+            <table class="price-table">
+                <thead>
+                    <tr>
+                        <th>ენა</th>
+                        <th>თარგმნა</th>
+                        <th>თარგმნა + დამოწმება</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>🇬🇧 ინგლისური</td><td>20₾</td><td>27₾ – 22₾</td></tr>
+                    <tr><td>🇹🇷 თურქული</td><td>25₾</td><td>32₾ – 27₾</td></tr>
+                    <tr><td>🇩🇪 გერმანული</td><td>25₾</td><td>32₾ – 27₾</td></tr>
+                    <tr><td>🇨🇳 ჩინური</td><td>68₾</td><td>75₾ – 70₾</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align: center; font-size: 0.9em;"><em>* ემატება 5₾ ნოტარიუსის მიერ აკინძვის ღირებულება</em></p>
+        </div>
 
-        .btn:active {
-            background-color: #cc8c00;
-            transform: translateY(0);
-        }
+        <div class="why-choose">
+            <h2>რატომ უნდა აირჩიოთ თარგმნის სახლი?</h2>
+            <ul class="offer-list">
+                <li>სერტიფიცირებული და გამოცდილი თარჯიმნები</li>
+                <li>ნოტარიული დამოწმება</li>
+                <li>სწრაფი შესრულება</li>
+                <li>კონკურენტული ფასები</li>
+            </ul>
+        </div>
 
-        .btn-secondary {
-            background-color: #ffffff;
-            color: #24505a;
-            border: 2px solid #24505a;
-        }
-
-        .btn-secondary:hover {
-            background-color: #f0f6f7;
-            color: #1e434c;
-        }
-
-        @media (max-width: 600px) {
-            .email-container {
-                margin: 0;
-            }
-
-            .header {
-                flex-direction: column;
-                text-align: center;
-            }
-
-            .header-content {
-                margin-left: 0;
-                margin-top: 15px;
-            }
-
-            .logo {
-                width: 100px;
-            }
-
-            .content {
-                padding: 20px 15px;
-            }
-
-            .header h1 {
-                font-size: 2em;
-            }
-
-            .price-table {
-                font-size: 0.8em;
-                min-width: 600px;
-            }
-
-            .price-table th,
-            .price-table td {
-                padding: 8px 4px;
-                white-space: nowrap;
-            }
-
-            .country-flag {
-                font-size: 1.2em;
-            }
-        }
-        </style>
-    </head>
-    <body>
-        <div class="email-container">
-            <!-- Header -->
-            <div class="header">
-                <img src="https://th.com.ge/assets/images/logo.jpg" alt="თარგმნის სახლი" class="logo">
-                <div class="header-content">
-                    <h1>თარგმნის სახლი</h1>
-                    <p>სატენდერო დოკუმენტების თარგმნა და ნოტარიული დამოწმება</p>
-                </div>
-            </div>
-
-            <!-- Content -->
-            <div class="content">
-                <p style="font-size: 1.1em; margin-bottom: 30px;">თუ თქვენი კომპანია <strong>სახელმწიფო შესყიდვებში მონაწილეობს</strong>, გთავაზობთ სპეციალურ პირობებს დოკუმენტაციის თარგმნისთვის.</p>
-
-                <!-- Special Offer -->
-                <div class="special-offer">
-                    <h2>სპეციალური შეთავაზება თქვენთვის:</h2>
-
-                    <ul class="offer-list">
-                        <li><strong>15%-იანი ფასდაკლება</strong>&nbsp; ნოტარიულად დამოწმებულ პირველ თარგმანზე</li>
-                        <li><strong>შესრულების დაჩქარებული ვადები</strong>&nbsp; - დროული მიწოდება გარანტირებულია</li>
-                        <li><strong>პერსონალური მენეჯერი</strong>&nbsp; თქვენი პროექტისთვის</li>
-                    </ul>
-                </div>
-
-                <!-- Price List -->
-                <div class="price-section">
-                    <h2>ფასთა ცხრილი</h2>
-                    <div class="price-table-container">
-                        <table class="price-table">
-                            <thead>
-                                <tr>
-                                    <th rowspan="2">ენა</th>
-                                    <th>თარგმნა</th>
-                                    <th colspan="4">თარგმნა + დამოწმება</th>
-                                </tr>
-                                <tr>
-                                    <th>1 გვერდი</th>
-                                    <th>1 გვერდი</th>
-                                    <th>2-10 გვერდი</th>
-                                    <th>10-50 გვერდი</th>
-                                    <th>50+ გვერდი</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="country-flag">
-                                        🇬🇧
-                                    </td>
-                                    <td class="price">20₾</td>
-                                    <td class="price">27₾</td>
-                                    <td class="price">25₾</td>
-                                    <td class="price">24₾</td>
-                                    <td class="price">22₾</td>
-                                </tr>
-                                <tr>
-                                    <td class="country-flag">
-                                        🇹🇷
-                                    </td>
-                                    <td class="price">25₾</td>
-                                    <td class="price">32₾</td>
-                                    <td class="price">30₾</td>
-                                    <td class="price">29₾</td>
-                                    <td class="price">27₾</td>
-                                </tr>
-                                <tr>
-                                    <td class="country-flag">
-                                        🇩🇪
-                                    </td>
-                                    <td class="price">25₾</td>
-                                    <td class="price">32₾</td>
-                                    <td class="price">30₾</td>
-                                    <td class="price">29₾</td>
-                                    <td class="price">27₾</td>
-                                </tr>
-                                <tr>
-                                    <td class="country-flag">
-                                        🇨🇳
-                                    </td>
-                                    <td class="price">68₾</td>
-                                    <td class="price">75₾</td>
-                                    <td class="price">73₾</td>
-                                    <td class="price">72₾</td>
-                                    <td class="price">70₾</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <p style="margin-top: 15px; font-size: 0.9em; color: #666; text-align: center; font-style: italic;">
-                        * თითო დოკუმენტის დამოწმებას ემატება 5₾ ნოტარიუსთან აკინძვის ღირებულება
-                    </p>
-                </div>
-
-                <!-- Why Choose Us -->
-                <div class="why-choose">
-                    <h2>რატომ უნდა აირჩიოთ "თარგმნის სახლი"?</h2>
-                    <div class="features">
-                        <div class="feature">
-                            <h3>სერტიფიცირებული თარჯიმნები</h3>
-                            <p>მხოლოდ კვალიფიციური და გამოცდილი სპეციალისტები</p>
-                        </div>
-                        <div class="feature">
-                            <h3>ნოტარიული დამოწმება</h3>
-                            <p>სრული იურიდიული ღირებულება</p>
-                        </div>
-                        <div class="feature">
-                            <h3>სწრაფი შესრულება</h3>
-                            <p>დროული მიწოდება გარანტირებულია</p>
-                        </div>
-                        <div class="feature">
-                            <h3>კონკურენტული ფასები</h3>
-                            <p>საუკეთესო თანაფარდობა ფასი/ხარისხი</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Languages -->
-                <div class="languages">
-                    <h2>ენები, რომლებზეც ვთარგმნით</h2>
-                    <p>ჩვენ გთავაზობთ პროფესიონალურ თარგმანს შემდეგ ენებზე:</p>
-                    <div class="language-grid">
-                        <div class="language">🇬🇧 ინგლისური</div>
-                        <div class="language">🇷🇺 რუსული</div>
-                        <div class="language">🇩🇪 გერმანული</div>
-                        <div class="language">🇫🇷 ფრანგული</div>
-                        <div class="language">🇨🇳 ჩინური</div>
-                        <div class="language">🇹🇷 თურქული</div>
-                        <div class="language">🇺🇦 უკრაინული</div>
-                        <div class="language">🌍 და სხვა</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Contact Section -->
-            <div class="contact-section">
-                <h2>მოგვწერეთ ახლავე</h2>
-                <p>დაგვიკავშირდით დღესვე:</p>
-
-                <div class="contact-info">
-                    <div class="contact-person">
-                        <h3>თამარი</h3>
-                        <p>📞 +995 568 42 05 53</p>
-                        <a href="https://iuristi.ge/translation/tako.vcf" download="tako.vcf" class="btn">📥 ნომრის ჩანიშვნა</a>
-                    </div>
-                </div>
-
-                <p>📧 info@th.com.ge</p>
-                <p style="margin-top: 20px; font-size: 1.2em;"><strong>გისურვებთ წარმატებას სატენდერო პროცესში!</strong></p>
-            </div>
-
-            <!-- Footer -->
-            <div class="footer">
-                <h3>თარგმნის სახლი</h3>
-                <p>მისამართი: თბილისი, ც. დადიანის 7 (ქარვასლა)</p>
-                <p>© 2025 თარგმნის სახლი - ყველა უფლება დაცულია</p>
+        <div class="languages">
+            <h2>ჩვენი ენები</h2>
+            <div class="language-grid">
+                <div class="language">🇬🇧 ინგლისური</div>
+                <div class="language">🇷🇺 რუსული</div>
+                <div class="language">🇩🇪 გერმანული</div>
+                <div class="language">🇫🇷 ფრანგული</div>
+                <div class="language">🇨🇳 ჩინური</div>
+                <div class="language">🇹🇷 თურქული</div>
+                <div class="language">🇺🇦 უკრაინული</div>
+                <div class="language">🌍 სხვა</div>
             </div>
         </div>
-    </body>
+    </div>
+
+    <div class="contact-section">
+        <h2>დაგვიკავშირდით მარტივად</h2>
+        <p>📞 <a href="tel:+995568420553" style="color:white; text-decoration: underline;">+995 568 42 05 53</a></p>
+        <p>📧 <a href="mailto:info@th.com.ge" style="color:white; text-decoration: underline;">info@th.com.ge</a></p>
+        <a href="https://wa.me/995568420553" class="btn">💬 WhatsApp-ზე მიწერა</a>
+        <a href="tel:+995568420553" class="btn btn-secondary">📞 დარეკვა ახლა</a>
+        <div style="margin-top: 30px;">
+            <h3 style="color: #ffffff;">✅ ჩვენ გვენდობა 200+ კომპანია</h3>
+            <p>📄 ზუსტი თარგმანი | ⏱️ დროული მიწოდება | 🔒 კონფიდენციალურობა</p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <h3>თარგმნის სახლი</h3>
+        <p>თბილისი, ც. დადიანის 7 (ქარვასლა)</p>
+        <p>© 2025 ყველა უფლება დაცულია</p>
+    </div>
+</div>
+</body>
 </html>

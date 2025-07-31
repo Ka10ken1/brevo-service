@@ -3,6 +3,7 @@ import requests
 import logging
 import io
 import os
+from datetime import datetime
 import time
 from pathlib import Path
 from dotenv import load_dotenv
@@ -12,7 +13,6 @@ load_dotenv()
 
 SENDER_NAME = os.getenv("SENDER_NAME")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-CAMPAIGN_LIST_ID = int(os.getenv("CAMPAIGN_LIST_ID"))
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -163,6 +163,93 @@ def add_contact(email: str, existing_contacts: set, list_ids=None, contact_data=
     return send_contact_payload(email, payload, contact_exists)
 
 
+def get_or_create_folder(name: str) -> int | None:
+    url = "https://api.brevo.com/v3/contacts/folders"
+    try:
+        response = requests.get(url, headers=HEADERS)
+        response.raise_for_status()
+        folders = response.json().get("folders", [])
+
+        for folder in folders:
+            if folder.get("name") == name:
+                logging.info(
+                    f"Found existing folder '{name}' with ID: {folder.get('id')}"
+                )
+                return folder.get("id")
+
+    except Exception as e:
+        logging.error(f"Error checking existing folders: {str(e)}")
+        return None
+
+    logging.info(f"Folder '{name}' not found. Creating new one...")
+    return create_folder(name)
+
+
+def create_folder(name: str) -> int | None:
+    url = "https://api.brevo.com/v3/contacts/folders"
+    payload = {"name": name}
+
+    try:
+        response = requests.post(url, json=payload, headers=HEADERS)
+        if response.status_code in (201, 202):
+            folder_id = response.json().get("id")
+            logging.info(f"Created new folder '{name}' with ID: {folder_id}")
+            return folder_id
+        else:
+            logging.error(f"Failed to create folder '{name}': {response.text}")
+            return None
+    except Exception as e:
+        logging.error(f"Exception creating folder '{name}': {str(e)}")
+        return None
+
+
+def create_new_contact_list(csv_name: str) -> int | None:
+    folder_id = get_or_create_folder("Winners")  # One folder to rule them all
+
+    if not folder_id:
+        logging.error("Failed to get or create folder for contact lists")
+        return None
+
+    url = "https://api.brevo.com/v3/contacts/lists"
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    payload = {
+        "name": f"Imported List - {csv_name} - {now_str}",
+        "folderId": folder_id,
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=HEADERS)
+        if response.status_code in (201, 202):
+            list_id = response.json().get("id")
+            logging.info(f"Created new contact list with ID: {list_id}")
+            return list_id
+        else:
+            logging.error(f"Failed to create contact list: {response.text}")
+            return None
+    except Exception as e:
+        logging.error(f"Exception creating contact list: {str(e)}")
+        return None
+
+
+def rename_folder(folder_id: int, new_name: str) -> bool:
+    url = f"https://api.brevo.com/v3/contacts/folders/{folder_id}"
+    payload = {"name": new_name}
+
+    try:
+        response = requests.put(url, json=payload, headers=HEADERS)
+        if response.status_code in (200, 204):
+            logging.info(f"Renamed folder {folder_id} to '{new_name}'")
+            return True
+        else:
+            logging.error(f"Failed to rename folder {folder_id}: {response.text}")
+            return False
+    except Exception as e:
+        logging.error(f"Exception while renaming folder {folder_id}: {str(e)}")
+        return False
+
+
 def build_payload(email: str, list_ids, contact_data: dict | None) -> dict:
     payload = {
         "email": email,
@@ -180,8 +267,6 @@ def build_payload(email: str, list_ids, contact_data: dict | None) -> dict:
 
     if list_ids:
         payload["listIds"] = list_ids
-    elif CAMPAIGN_LIST_ID:
-        payload["listIds"] = [CAMPAIGN_LIST_ID]
 
     return payload
 
@@ -264,45 +349,6 @@ def retry_without_sms(email: str, payload: dict):
     else:
         logging.info(f"No other attributes to update for {email}, treating as success")
         return MockResponse(204, "No attributes to update after removing duplicate SMS")
-
-
-def normalize_georgian_phone(phone: str) -> str | None:
-    phone = str(phone).strip()
-
-    if phone.startswith("+995"):
-        national_part = phone[4:]
-        if len(national_part) == 9 and national_part[0] == "5":
-            return phone
-        else:
-            logging.warning(
-                f"Invalid Georgian phone number format: {phone}. Expected +995 followed by 9 digits starting with 5"
-            )
-            return None
-
-    elif phone.startswith("995"):
-        national_part = phone[3:]
-        if len(national_part) == 9 and national_part[0] == "5":
-            return "+" + phone
-        else:
-            logging.warning(
-                f"Invalid Georgian phone number format: {phone}. Expected 995 followed by 9 digits starting with 5"
-            )
-            return None
-
-    elif phone.startswith("5") and len(phone) == 9:
-        return "+995" + phone
-
-    elif phone.startswith("0") and len(phone) == 10:
-        return "+995" + phone[1:]
-
-    elif phone.startswith("+"):
-        return phone  # Trust it for now
-
-    else:
-        logging.warning(
-            f"Unrecognized phone number format: {phone}. Unable to format for Georgian standards"
-        )
-        return None
 
 
 def load_html_template(filename: str) -> str:
@@ -388,30 +434,6 @@ def send_campaign_to_contacts(campaign_id: int) -> dict:
         return {"success": False, "error": f"Exception: {str(e)}", "status_code": None}
 
 
-def send_info_email_campaign():
-    url = "https://api.brevo.com/v3/emailCampaigns"
-
-    html_content = load_html_template("message_template.html")
-
-    payload = {
-        "sender": {"name": SENDER_NAME, "email": SENDER_EMAIL},
-        "name": "Business Partnership Opportunity",
-        "subject": "დოკუმენტაციის თარგმნა ნოტარიულად დამოწმებით",
-        "htmlContent": f"{html_content}",
-        "recipients": {"listIds": [CAMPAIGN_LIST_ID]},
-    }
-
-    response = requests.post(url, json=payload, headers=HEADERS)
-
-    if response.status_code not in (201, 202):
-        logging.warning(
-            f"Failed to create campaign: {response.status_code} {response.text}"
-        )
-    else:
-        logging.info("Campaign email created and scheduled/sent.")
-    return response
-
-
 def send_info_email(email: str):
     if not SENDER_EMAIL:
         logging.error("SENDER_EMAIL not configured in environment variables")
@@ -441,6 +463,25 @@ def send_info_email(email: str):
     else:
         logging.info(f"Info email sent to {email}")
     return resp
+
+
+def get_campaign_details(campaign_id: int) -> dict:
+    url = f"https://api.brevo.com/v3/emailCampaigns/{campaign_id}"
+
+    try:
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code == 200:
+            campaign_data = response.json()
+            logging.info(f"Campaign {campaign_id} details: {campaign_data}")
+            return campaign_data
+        else:
+            logging.error(
+                f"Failed to get campaign details: {response.status_code} {response.text}"
+            )
+            return {}
+    except Exception as e:
+        logging.error(f"Exception getting campaign details: {str(e)}")
+        return {}
 
 
 def extract_email(row: dict) -> str:
@@ -473,7 +514,12 @@ def process_contact(
 ):
     if email in existing_emails:
         update_existing_contact(
-            email, contact_data, results, existing_emails, detailed_contacts_by_email
+            email,
+            campaign_list_id,
+            contact_data,
+            results,
+            existing_emails,
+            detailed_contacts_by_email,
         )
     else:
         create_new_contact_for_campaign(
@@ -481,14 +527,57 @@ def process_contact(
         )
 
 
+def check_contact_status(email: str):
+    url = f"https://api.brevo.com/v3/contacts/{email}"
+
+    try:
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code == 200:
+            contact_data = response.json()
+            logging.info(f"Contact {email} status:")
+            logging.info(
+                f"  - Email Blacklisted: {contact_data.get('emailBlacklisted', False)}"
+            )
+            logging.info(
+                f"  - SMS Blacklisted: {contact_data.get('smsBlacklisted', False)}"
+            )
+            logging.info(f"  - List IDs: {contact_data.get('listIds', [])}")
+            return contact_data
+        else:
+            logging.error(
+                f"Failed to get contact status: {response.status_code} {response.text}"
+            )
+            return None
+    except Exception as e:
+        logging.error(f"Exception checking contact status: {str(e)}")
+        return None
+
+
 def update_existing_contact(
     email: str,
+    campaign_list_id: int,
     contact_data: dict,
     results: dict,
     existing_emails: set,
     detailed_contacts_by_email: dict,
 ):
     existing = detailed_contacts_by_email.get(email)
+
+    if existing:
+        if existing.get("emailBlacklisted", False):
+            logging.warning(
+                f"Contact {email} is EMAIL BLACKLISTED - will not receive emails!"
+            )
+        if existing.get("smsBlacklisted", False):
+            logging.warning(f"Contact {email} is SMS BLACKLISTED")
+
+        old_code = existing.get("attributes", {}).get("TENDER_CODE", "")
+        new_code = contact_data.get("tender_code", "")
+        if new_code and old_code and new_code != old_code:
+            contact_data["tender_code"] = f"{new_code};{old_code}"
+            logging.info(
+                f"Updated tender_code for {email}: {contact_data['tender_code']}"
+            )
 
     if existing:
         old_code = existing.get("attributes", {}).get("TENDER_CODE", "")
@@ -499,10 +588,15 @@ def update_existing_contact(
                 f"Updated tender_code for {email}: {contact_data['tender_code']}"
             )
 
-    resp = add_contact(email, existing_emails, contact_data=contact_data)
+    resp = add_contact(
+        email, existing_emails, list_ids=[campaign_list_id], contact_data=contact_data
+    )
+
     if resp and resp.status_code in (201, 204):
         results["updated_contacts"].append({"email": email, "data": contact_data})
-        logging.info(f"Existing contact {email} updated but not added to campaign")
+        logging.info(
+            f"Existing contact {email} updated and added to campaign list {campaign_list_id}"
+        )
     else:
         results["errors"].append(
             {
@@ -537,50 +631,51 @@ def create_new_contact_for_campaign(
         )
 
 
-def handle_csv(file_bytes: bytes):
+def _get_csv_reader(file_bytes: bytes):
     decoded = file_bytes.decode("utf-8")
-    reader = csv.DictReader(io.StringIO(decoded))
+    return csv.DictReader(io.StringIO(decoded))
 
+
+def _fetch_existing_contacts():
     logging.info("Fetching all existing contacts from Brevo...")
-
     existing_contacts_email = get_existing_contacts_email()
     detailed_contacts = get_detailed_contacts()
 
     detailed_contacts_by_email = {
-        c["email"].lower(): c
-        for c in detailed_contacts
-        if c.get("email")  # only keep contacts with email present and non-empty
+        c["email"].lower(): c for c in detailed_contacts if c.get("email")
     }
 
     logging.info(
         f"Found {len(existing_contacts_email)} existing contacts in your Brevo account"
     )
 
-    results = {
+    return existing_contacts_email, detailed_contacts_by_email
+
+
+def _init_results(total_existing: int):
+    return {
         "added_to_campaign": [],
         "updated_contacts": [],
         "errors": [],
         "campaign_info": {},
-        "total_existing_contacts": len(existing_contacts_email),
+        "total_existing_contacts": total_existing,
     }
 
-    logging.info("Creating new campaign for CSV import...")
 
-    campaign_result = create_new_campaign(CAMPAIGN_LIST_ID)
+def _ensure_folder(name: str):
+    folder_id = get_or_create_folder(name)
+    if not folder_id:
+        logging.error(f"Failed to find or create '{name}' folder. Aborting.")
+    return folder_id
 
-    results["campaign_info"] = campaign_result
 
-    if not campaign_result["success"]:
-        logging.error("Failed to create campaign. Aborting CSV processing.")
-        results["errors"].append(
-            {"error": "Failed to create campaign", "details": campaign_result["error"]}
-        )
-        return results
-
-    campaign_id = campaign_result["campaign_id"]
-
-    logging.info(f"Campaign created with ID: {campaign_id}")
-
+def _process_all_rows(
+    reader,
+    existing_emails: set,
+    detailed_contacts_by_email: dict,
+    results: dict,
+    campaign_list_id: int,
+):
     for row in reader:
         email = extract_email(row)
         if not email:
@@ -593,27 +688,84 @@ def handle_csv(file_bytes: bytes):
             process_contact(
                 email,
                 contact_data,
-                existing_contacts_email,
+                existing_emails,
                 results,
-                CAMPAIGN_LIST_ID,
+                campaign_list_id,
                 detailed_contacts_by_email,
             )
         except Exception as e:
             results["errors"].append({"email": email, "error": str(e)})
 
-    # if results["added_to_campaign"]:
-    #     send_result = send_campaign_to_contacts(campaign_id)
-    #     results["campaign_info"]["send_result"] = send_result
-    #
-    #     if send_result["success"]:
-    #         logging.info("Campaign sent successfully to all new contacts!")
+
+def handle_csv(file_bytes: bytes):
+    reader = _get_csv_reader(file_bytes)
+    existing_emails, detailed_by_email = _fetch_existing_contacts()
+
+    results = _init_results(len(existing_emails))
+
+    folder_id = _ensure_folder("Winners")
+    if not folder_id:
+        return {"errors": [{"error": "Folder setup failed"}]}
+
+    csv_list_id = create_new_contact_list("csv_import")
+    if not csv_list_id:
+        return {"errors": [{"error": "Failed to create contact list"}]}
+
+    campaign_result = create_new_campaign(csv_list_id)
+
+    logging.info(campaign_result)
+
+    results["campaign_info"] = campaign_result
+
+    if not campaign_result["success"]:
+        results["errors"].append(
+            {"error": "Failed to create campaign", "details": campaign_result["error"]}
+        )
+        return results
+
+    _process_all_rows(
+        reader,
+        existing_emails,
+        detailed_by_email,
+        results,
+        csv_list_id,
+    )
+
+    campaign_id = campaign_result["campaign_id"]
+
+    # Debug: Check campaign details before sending
+    # logging.info("=== DEBUGGING CAMPAIGN BEFORE SENDING ===")
+    # campaign_details = get_campaign_details(campaign_id)
+
+    # logging.info("=== CHECKING CONTACT STATUS ===")
+    # check_contact_status("matekopaliani12@gmail.com")
+    # logging.info("=== END CONTACT STATUS ===")
+
+    # Debug: Check list contents
+    # list_details_url = f"https://api.brevo.com/v3/contacts/lists/{csv_list_id}"
+    # try:
+    #     list_response = requests.get(list_details_url, headers=HEADERS)
+    #     if list_response.status_code == 200:
+    #         list_data = list_response.json()
+    #         logging.info(
+    #             f"List {csv_list_id} has {list_data.get('totalSubscribers', 0)} subscribers"
+    #         )
+    #         logging.info(f"List details: {list_data}")
     #     else:
-    #         logging.error(f"Failed to send campaign: {send_result['error']}")
-    # else:
-    #     logging.info("No new contacts were added, so campaign was not sent.")
-    #     results["campaign_info"]["send_result"] = {
-    #         "success": False,
-    #         "message": "No new contacts to send to",
-    #     }
+    #         logging.error(
+    #             f"Failed to get list details: {list_response.status_code} {list_response.text}"
+    #         )
+    # except Exception as e:
+    #     logging.error(f"Exception getting list details: {str(e)}")
+    #
+    # logging.info("=== END DEBUGGING ===")
+    #
+    send_result = send_campaign_to_contacts(campaign_id)
+    results["campaign_info"]["send_result"] = send_result
+
+    if send_result["success"]:
+        logging.info("Campaign sent successfully to all contacts in the CSV list!")
+    else:
+        logging.error(f"Failed to send campaign: {send_result['error']}")
 
     return results
