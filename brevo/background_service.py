@@ -351,8 +351,8 @@ class BrevoBackgroundService:
 
     def _run_at_georgian_time(self):
         now = datetime.now(tz=GEORGIAN_TZ)
-        if now.hour == 11 and now.minute == 0:
-            logger.info("Georgian time is 11:00 - running daily_csv_processing")
+        if now.hour == 3 and now.minute == 0:
+            logger.info("Georgian time is 3:00 - running daily_csv_processing")
             self.daily_csv_processing()
 
     def start(self):
@@ -363,7 +363,7 @@ class BrevoBackgroundService:
         schedule.every().hour.do(self.cleanup_logs)
         schedule.every().day.at("09:00").do(self.send_daily_report)
 
-        # run at georgian 11:00 AM time
+        # run at georgian 3:00 AM time
         schedule.every(1).minutes.do(self._run_at_georgian_time)
 
         logger.info("Background service started successfully")
@@ -371,7 +371,7 @@ class BrevoBackgroundService:
         logger.info("  - Health check: Every 5 minutes")
         logger.info("  - Log cleanup: Every hour")
         logger.info("  - Daily report: 09:00 daily")
-        logger.info("  - Daily CSV processing: 11:00 daily")
+        logger.info("  - Daily CSV processing: 3:00 daily")
 
         self.health_check()
 
