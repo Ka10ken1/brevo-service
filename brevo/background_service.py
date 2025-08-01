@@ -325,8 +325,8 @@ class BrevoBackgroundService:
         schedule.every().hour.do(self.cleanup_logs)
         schedule.every().day.at("09:00").do(self.send_daily_report)
 
-        # Schedule daily CSV processing at 2:00 PM
-        schedule.every().day.at("14:00").do(self.daily_csv_processing)
+        # Schedule daily CSV processing at 2:00 AM
+        schedule.every().day.at("02:00").do(self.daily_csv_processing)
 
         logger.info("Background service started successfully")
         logger.info("Scheduled tasks:")
